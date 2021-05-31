@@ -233,8 +233,20 @@ def liveness_body (body, liveness):
 
     return new_block_items, liveness 
 
-def liveness(ast):
-    pass
+def liveness(raw):
+    
+    f = open('scratch/temp.c', 'wb')
+    f.write(raw)
+    
+    ast = parse_file('scratch/temp.c', use_cpp=True)
+   
+    body = ast.ext[0].body
+
+    ast.ext[0].body.block_items, liveness = liveness_body(body.block_items, init_liveness)
+
+    gen = c_generator.CGenerator()
+
+    return bytes(gen.visit(ast), 'utf-8')
 
 if __name__ == "__main__":
     
@@ -243,16 +255,15 @@ if __name__ == "__main__":
     parser.add_argument('output_file', metavar='o', type=str, help="output file")
 
     args = parser.parse_args()
-   
-    ast = parse_file(args.input_file, use_cpp=True)
-    body = ast.ext[0].body
 
-    ast.ext[0].body.block_items, liveness = liveness_body(body.block_items, init_liveness)
+    f = open(args.input_file, 'rb')
 
-    gen = c_generator.CGenerator()
+    raw = f.read()
 
-    out = open(args.output_file, 'w')
+    output = liveness(raw)
 
-    out.write(gen.visit(ast))
+    out = open(args.output_file, 'wb')
+
+    out.write(output)
 
     

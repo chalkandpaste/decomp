@@ -36,13 +36,16 @@ def map_sections (sections):
     return new_sections
 
 
-def preprocess_file(f):
+def preprocess_input(raw):
+
+    lines = raw.split(b'\n')
+
     sections = []
 
     comment_switch = False
 
     section = []
-    for line in f:
+    for line in lines:
         stripped = line.lstrip()
         if stripped.startswith(b'/*'):
             sections.append({'type' : comment_switch, 'section': section})
@@ -60,16 +63,19 @@ def preprocess_file(f):
     sections.append({'type' : comment_switch, 'section' : section}) ## write the last section
     return sections
 
-def write_output(sections, f):
+def convert_output(sections):
+    out = []
     for section in sections:
         if section['type']:
             for line in section['section']:
-                f.write(line)
+                out.append(line)
             for line in section['code']:
-                f.write(line)
+                out.append(line)
         else:
             for line in section['section']:
-                f.write(line)
+                out.append(line)
+
+    return b'\n'.join(out)
 
 def binop(sign, i):
     if len(i) <= 4:
@@ -245,6 +251,15 @@ c_map = {
     b'[' : empty,
 }
 
+def convert(raw):
+    
+    sections = preprocess_input(raw)
+
+    mapped_sections = map_sections(sections)
+    
+    return convert_output(mapped_sections)
+    
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser('Provide input and output locations')
@@ -254,11 +269,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     f = open(args.input_file, 'rb')
-    sections = preprocess_file(f)
 
-    mapped_sections = map_sections(sections)
+    raw = f.read()
+
+    output = convert(raw)
   
-    out = open(args.output_file, 'wb')
+    out_file = open(args.output_file, 'wb')
 
-    write_output(mapped_sections, out)
+    out_file.write(output)
+
 

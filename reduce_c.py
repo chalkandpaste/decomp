@@ -3,6 +3,8 @@ import argparse
 
 import sys
 
+global while_killer
+global func_killer
 
 global var_counter
 
@@ -168,13 +170,13 @@ def expr_depth(ex, limit = 3):
 
     return e_dep(ex, 0, limit) >= limit
 
-def simplify_expr(e, scope):
+def reduce_expr(e, scope):
 
     if isinstance(e, c_ast.BinaryOp):
-        e.left = simplify_expr(e.left, scope)
-        e.right = simplify_expr(e.right, scope)
+        e.left = reduce_expr(e.left, scope)
+        e.right = reduce_expr(e.right, scope)
     elif isinstance(e, c_ast.UnaryOp):
-        e.expr = simplify_expr(e.expr, scope)
+        e.expr = reduce_expr(e.expr, scope)
     elif isinstance(e, c_ast.ID):
         if e.name in scope and scope[e.name] is not None:
             e = scope[e.name]
@@ -185,9 +187,9 @@ def simplify_expr(e, scope):
         if func_killer:
             pass
         else:
-            e = simplify_func(e, scope)
+            e = reduce_func(e, scope)
     elif isinstance(e, c_ast.Cast):
-        e.expr = simplify_expr(e.expr, scope)
+        e.expr = reduce_expr(e.expr, scope)
     elif isinstance(e, c_ast.Return):
         pass
     else:
@@ -195,7 +197,7 @@ def simplify_expr(e, scope):
         raise Exception
     return e
 
-# def simplify_expr_non_recursive(e, scope):
+# def reduce_expr_non_recursive(e, scope):
 
     # arg_stack = []
     # op_stack = []
@@ -215,9 +217,9 @@ def simplify_expr(e, scope):
         # elif isinstance(e, c_ast.Constant):
             # pass
         # elif isinstance(e, c_ast.FuncCall):
-            # e = simplify_func(e, scope)
+            # e = reduce_func(e, scope)
         # elif isinstance(e, c_ast.Cast):
-            # e.expr = simplify_expr(e.expr, scope)
+            # e.expr = reduce_expr(e.expr, scope)
         # elif isinstance(e, c_ast.Return):
             # pass
         # else:
@@ -227,15 +229,15 @@ def simplify_expr(e, scope):
     # return e
 
 
-def simplify_if (i, scope):
-    i.cond = simplify_expr(i.cond, scope)
+def reduce_if (i, scope):
+    i.cond = reduce_expr(i.cond, scope)
 
     if i.iftrue:
         if isinstance(i.iftrue, c_ast.ExprList):
-            i.iftrue, true_scope = simplify_body(i.iftrue.exprs, scope.copy())
+            i.iftrue, true_scope = reduce_body(i.iftrue.exprs, scope.copy())
             new_block_items.append(el)
         elif i.iftrue.block_items:
-            i.iftrue.block_items, true_scope = simplify_body(i.iftrue.block_items, scope)
+            i.iftrue.block_items, true_scope = reduce_body(i.iftrue.block_items, scope)
         else:
             true_scope = scope
 
@@ -244,10 +246,10 @@ def simplify_if (i, scope):
 
     if i.iffalse:
         if isinstance(i.iffalse, c_ast.ExprList):
-            i.iffalse, false_scope = simplify_body(i.iffalse.exprs, scope.copy())
+            i.iffalse, false_scope = reduce_body(i.iffalse.exprs, scope.copy())
             new_block_items.append(el)
         elif i.iffalse.block_items:
-            i.iffalse.block_items, false_scope = simplify_body(i.iffalse.block_items, scope)
+            i.iffalse.block_items, false_scope = reduce_body(i.iffalse.block_items, scope)
         else:
             false_scope = scope
     else:
@@ -269,28 +271,31 @@ def merge_while_scope(scope, w_scope):
    
     return scope
 
-def simplify_while (w, scope):
+def reduce_while (w, scope):
 
-    # simplify first within the while using unassigned scope
-    w.stmt.block_items, w_scope = simplify_body(w.stmt.block_items, init_scope.copy())
+    global while_killer
+
+    # reduce first within the while using unassigned scope
+    w.stmt.block_items, w_scope = reduce_body(w.stmt.block_items, init_scope.copy())
     
     # take out any variables that were used from the current scope
     scope = merge_while_scope(scope.copy(), w_scope) 
 
-    # simplify further with any scope
-    w.stmt.block_items, _= simplify_body(w.stmt.block_items, scope.copy())
+    if while_killer:
+        # reduce further with any scope
+        w.stmt.block_items, _= reduce_body(w.stmt.block_items, scope.copy())
     
     return w, scope
 
-def simplify_switch (s, scope):
+def reduce_switch (s, scope):
 
-    s.cond = simplify_expr(s.cond, scope)
+    s.cond = reduce_expr(s.cond, scope)
 
     case_scopes = []
     new_block_items = []
     for bi in s.stmt.block_items:
         if isinstance(bi, c_ast.Case) or isinstance(bi, c_ast.Default):
-            bi.stmts, c_scope = simplify_body(bi.stmts, scope.copy())
+            bi.stmts, c_scope = reduce_body(bi.stmts, scope.copy())
             case_scopes.append(c_scope)
             new_block_items.append(bi)
         else:
@@ -304,7 +309,7 @@ def simplify_switch (s, scope):
 
     return s, scope
 
-def simplify_func (f, scope):
+def reduce_func (f, scope):
     # global debug_counter
 
     # func_count = 39
@@ -328,7 +333,7 @@ def simplify_func (f, scope):
 
     return f
 
-def simplify_body (body, scope):
+def reduce_body (body, scope):
     
     new_block_items = []
     kill_list = []
@@ -337,7 +342,7 @@ def simplify_body (body, scope):
     for b in body:
         if isinstance(b, c_ast.Assignment):
             if isinstance(b.lvalue, c_ast.ID):
-                b.rvalue = simplify_expr(b.rvalue, scope)
+                b.rvalue = reduce_expr(b.rvalue, scope)
                 substitution,name,scope = add_to_scope(scope, b)
                 if substitution:
                     new_block_items.append(substitution)
@@ -345,12 +350,12 @@ def simplify_body (body, scope):
                 else:
                     new_block_items.append(b)
             elif isinstance(b.lvalue, c_ast.BinaryOp) and b.lvalue.op == '*':
-                b.lvalue = simplify_expr(b.lvalue,scope)
-                b.rvalue = simplify_expr(b.rvalue, scope)
+                b.lvalue = reduce_expr(b.lvalue,scope)
+                b.rvalue = reduce_expr(b.rvalue, scope)
                 new_block_items.append(b)
             elif isinstance(b.lvalue, c_ast.UnaryOp) and b.lvalue.op == '*':
-                b.lvalue.expr = simplify_expr(b.lvalue.expr, scope)
-                b.rvalue = simplify_expr(b.rvalue,scope)
+                b.lvalue.expr = reduce_expr(b.lvalue.expr, scope)
+                b.rvalue = reduce_expr(b.rvalue,scope)
                 new_block_items.append(b)
             else:
                 print(body.show())
@@ -358,11 +363,11 @@ def simplify_body (body, scope):
 
         
         elif isinstance(b, c_ast.If):
-            i, scope = simplify_if(b, scope.copy())
+            i, scope = reduce_if(b, scope.copy())
             new_block_items.append(i)
 
         elif isinstance(b, c_ast.While):
-            w, scope = simplify_while(b, scope.copy())
+            w, scope = reduce_while(b, scope.copy())
             new_block_items.append(w)
             # new_block_items.append(b)
 
@@ -371,15 +376,15 @@ def simplify_body (body, scope):
             if func_killer:
                 new_block_items.append(b)
             else:
-                f = simplify_func(b, scope)
+                f = reduce_func(b, scope)
                 new_block_items.append(f)
 
         elif isinstance(b, c_ast.Switch):
-            s, scope = simplify_switch(b, scope.copy())
+            s, scope = reduce_switch(b, scope.copy())
             new_block_items.append(s)
 
         elif isinstance(b, c_ast.Case) or isinstance(b, c_ast.Default):
-            b.stmts, c_scope = simplify_body(b.stmts, scope.copy())
+            b.stmts, c_scope = reduce_body(b.stmts, scope.copy())
             scope  = update_scope(scope, c_scope)
             new_block_items.append(b)
         
@@ -387,7 +392,7 @@ def simplify_body (body, scope):
             new_block_items.append(b)
 
         elif isinstance(b, c_ast.Return):
-            b = simplify_expr(b, scope)
+            b = reduce_expr(b, scope)
             new_block_items.append(b)
 
         else:
@@ -404,11 +409,30 @@ def simplify_body (body, scope):
 
     return new_block_items, scope 
 
+def reduce_c(raw, fk = False, wk = False):
+    global func_killer
+    func_killer = fk
+    global while_killer
+    while_killer = wk
+    global var_counter
+    var_counter = 0
+   
+    f = open('scratch/temp.c', 'wb')
+    f.write(raw)
+    
+    ast = parse_file('scratch/temp.c', use_cpp=True)
+
+    body = ast.ext[0].body
+
+    ast.ext[0].body.block_items, scope = reduce_body(body.block_items, init_scope.copy())
+
+    gen = c_generator.CGenerator()
+
+    return bytes(gen.visit(ast), 'utf-8')
+
 if __name__ == "__main__":
    
     # debug recursion
-    global func_killer
-    global when_killer
     global debug_counter
     debug_counter = 0
 
@@ -418,24 +442,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser('Provide input and output locations')
     parser.add_argument('input_file', metavar='i', type=str, help="input file")
     parser.add_argument('output_file', metavar='o', type=str, help="output file")
-    parser.add_argument('-f', type=bool, default=False, help="don't simplify non-return function calls")
-    parser.add_argument('-w', type=bool, default=False, help="don't simplify non-return function calls")
+    parser.add_argument('-f', type=bool, default=False, help="don't reduce non-return function calls")
+    parser.add_argument('-w', type=bool, default=False, help="don't reduce non-return function calls")
 
     args = parser.parse_args()
-  
-    func_killer = args.f
-    when_killer = args.w
 
-    var_counter = 0
+    f = open(args.input_file, 'rb')
 
-    ast = parse_file(args.input_file, use_cpp=True)
-    body = ast.ext[0].body
+    raw = f.read()
 
-    ast.ext[0].body.block_items, scope = simplify_body(body.block_items, init_scope.copy())
+    output = reduce_c(raw, args.f, args.w)
 
-    gen = c_generator.CGenerator()
+    out = open(args.output_file, 'wb')
 
-    out = open(args.output_file, 'w')
-
-    out.write(gen.visit(ast))
+    out.write(output)
 

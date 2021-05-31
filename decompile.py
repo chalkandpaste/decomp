@@ -1,18 +1,48 @@
 from convert_c import convert
-from simplify_c import simplify
+from reduce_c import reduce_c
 from liveness import liveness
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser('Provide input and output locations')
-    parser.add_argument('input_file', metavar='i', type=str, help="input file")
-    parser.add_argument('output_file', metavar='o', type=str, help="output file")
+    base_dir = 'scratch/'
 
-    args = parser.parse_args()
+    out_dir = 'out/'
 
-    assembly = open(args.input_file, 'rb')
+    names = ['9498', '14d14', '1479c', 'd630']
+    # names = ['14d14', '1479c', 'd630']
 
-    converted = convert(assembly)
-    simplified = simplify(converted)
-    reduced = liveness
+    for name in names:
 
+        f = open(base_dir + name + '.c', 'rb')
+        
+        cf_assembly = f.read()
+        try:
+            converted = convert(cf_assembly)
+            o = open(out_dir + name + '.c.c', 'wb')
+            o.write(converted)
+        except:
+            continue
+
+
+        try:
+            if name == '9498':
+                reduced = reduce_c(converted, True, True)
+            else:
+                reduced = reduce_c(converted)
+
+            o = open(out_dir + name + '.s.c', 'wb')
+            o.write(reduced)
+        except:
+            continue
+       
+        try:
+            livened = liveness(reduced)
+            o = open(out_dir + name + '.l.c', 'wb')
+            o.write(livened)
+        except:
+            continue
+    
+    funcs = []
+
+    for f in funcs:
+        pass
