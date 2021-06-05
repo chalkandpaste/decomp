@@ -1,3 +1,4 @@
+# from disassemble import generate_func_cf_asm
 from convert_c import convert
 from reduce_c import reduce_c
 from liveness import liveness

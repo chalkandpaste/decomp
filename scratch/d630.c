@@ -3482,10 +3482,11 @@ void func_0xD630( int r0, int r1, int r2,  int r3 ) {
        .text:0x0000EFE8    BDE8F05F             pop.w {r4, r5, r6, r7, r8, sb, sl, fp, ip, lr}
        .text:0x0000EFEC    F3F7BCBF             b.w func_0x2F68; inline void __cdecl( int p1 )
        */
-  }
+  } else {
   /*
      .text:0x0000EFF0 code_0xEFF0:
      .text:0x0000EFF0    BDEC0E8B             vpop {d8, d9, d10, d11, d12, d13, d14}
      .text:0x0000EFF4    BDE8F09F             pop.w {r4, r5, r6, r7, r8, sb, sl, fp, ip, pc}
      */
+  }
 }
