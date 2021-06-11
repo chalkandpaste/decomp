@@ -92,11 +92,11 @@ cond_block_end_zero = [ b'cbnz', b'cbz' ]
 
 cond_block_end = [ b'bls.w', b'bls',
         b'beq', b'beq.n', b'beq.w',
-        b'bne', b'bne.w',
+        b'bne', b'bne.w', b'bne.n',
         b'blt', b'blt.n', b'blt.w',
-        b'blo', b'blo.n', b'blo.w',
-        b'bhi', b'bhi.w',
-        b'bhs', b'bhs.w',
+        b'blo', b'blo.n', b'blo.w', b'bcc', b'bcc.n', b'bcc.w'
+        b'bhi', b'bhi.w', b'bpl.n', b'bpl.w'
+        b'bhs', b'bhs.w', b'bhs.n', b'bcs', b'bcs.w', b'bcs.n',
         b'ble', b'ble.w', b'ble.n',
         b'bge', b'bge.w', b'bge.n',
         b'bls', b'bls.w', b'bls.n'
@@ -183,6 +183,39 @@ def mk_block(loc, block, end_loc, children = [], parents = []):
             'depth'      : 0
             }
 
+def recurse_graph(block_graph, f, base_case, direction):
+    start_block = block_graph['start_block']
+    block_index = block_graph['index']
+    return recurse_blocks(start_block, block_index, f, base_case, direction)
+
+def recurse_blocks(block, block_index, f, base_case, direction):
+
+    out = base_case
+
+    retrace_nodes = [block]
+
+    # mark them false as we proceed through, faster than lists
+    tally = { i : True for i in block_index }
+
+    direction = -1 if direction else 0
+
+    while len(retrace_nodes) > 0:
+        curr_block = retrace_nodes.pop(direction)
+        children = [block_index[i] for i in curr_block['children']]
+
+        tally[curr_block['loc']] = False # visited
+
+        # do thing
+        out = f(curr_block, block_index, out)
+
+        # get it ready for the next iteration
+
+        for c in children:
+            if tally[c['loc']]: # if it hasn't been visited
+                retrace_nodes.append(c) # push
+
+    return out
+
 def generate_block_graph(binary, entry_point_loc=0x08020004):
 
     insns_buff = InstructionsBuffer(binary, entry_point_loc)
@@ -253,7 +286,7 @@ def generate_block_graph(binary, entry_point_loc=0x08020004):
             if not end_of_function:
                 children = get_children(block)
             else:
-                children = [] # hack because it's needed
+                children = []
 
             new_block = mk_block(search_loc, block, end_loc, children)
 
@@ -298,46 +331,22 @@ def generate_block_graph(binary, entry_point_loc=0x08020004):
     # determine parents for each node before we return
 
     def update_parents(block, _, block_index):
+        # print("update_parents", hex(block['loc']))
+        # print([hex(c) for c in block['children']])
         for child_loc in block['children']:
             child = block_index[child_loc]
 
             if block['loc'] not in child['parents']:
                 child['parents'].append(block['loc'])
+                # print(child)
                 block_index[child_loc] = child
 
         return block_index
 
     block_graph['index'] = recurse_graph(block_graph, update_parents, block_graph['index'], True)
 
-    # determine depth to make meta_block construction easy
-
-    def node_depth (block, _, block_index):
-        num_of_parents = len(block['parents'])
-
-        if num_of_parents == 0:
-            depth = 0
-
-        elif num_of_parents == 1:
-            parent = block_index[block['parents'][0]]
-            parent_depth = parent['depth']
-            parent_num_of_children = len(parent['children'])
-
-            depth = parent_depth + (1 if parent_num_of_children > 1 else 0)
-
-        elif num_of_parents >= 2:
-            parents = [block_index[p] for p in block['parents']]
-            parent_depths = [p['depth'] for p in parents]
-            depth = max(parent_depths) - 1
-
-        block['depth'] = depth
-
-        block_index[block['loc']] = block
-
-        return block_index
-
-    block_graph['index'] = recurse_graph(block_graph, node_depth, block_graph['index'], True)
-
     return block_graph
+
 
 # type if_meta_block -- block to contain if (triangle control flow)
 # { 'cond' cond, 'true' : meta_block  'next': meta_block }
@@ -349,255 +358,680 @@ def generate_block_graph(binary, entry_point_loc=0x08020004):
 # { 'while' : [meta_block], 'next': meta_block }
 #
 # type case_meta_block -- block containing returns
-# { 'cases' : [meta_block] } + meta_block
+# { 'cases' : [meta_block], 'next' : meta_block }
+
 # type end_meta_block
-# { 'end' : block } + meta_blocki
+# { 'end' : block }
 
-def recurse_graph(block_graph, f, base_case, direction):
-    start_block = block_graph['start_block']
-    block_index = block_graph['index']
-    return recurse_blocks(start_block, block_index, f, base_case, direction)
+class MetaBlockFinder:
 
-def recurse_blocks(block, block_index, f, base_case, direction):
+    def __init__(self, block_index):
+        self.block_index = block_index
+        self.loc_to_loop_end = {}
+        self.loc_to_loop_start = {}
+        self.loc_to_loop_locs = {}
+        self.not_loop_loc = {} # locs which are not in a loop
 
-    out = base_case
-
-    retrace_nodes = [block]
-
-    # mark them false as we proceed through, faster than lists
-    tally = { i : True for i in block_index }
-
-    direction = -1 if direction else 0
-
-    while len(retrace_nodes) > 0:
-        curr_block = retrace_nodes.pop(direction)
-        children = [block_index[i] for i in curr_block['children']]
-
-        tally[curr_block['loc']] = False # visited
-
-        # do thing
-        out = f(curr_block, block_index, out)
-
-        # get it ready for the next iteration
-
-        for c in children:
-            if tally[c['loc']]: # if it hasn't been visited
-                retrace_nodes.append(c) # push
-
-    return out
-
-def find_end_blocks(block, block_index):
-
-    def f(block, block_index, end_blocks):
-        if len(block['children']) == 0:
-            end_blocks.append(block)
-
-        return end_blocks
-
-    recurse_blocks(block, block_index, f, [], True)
-
-
-def get_next_meta_block_loc(block, block_index):
-    search_depth = block['depth']
+    def all_seen_are_reachable(self, reachable, end_loc):
+        # print("all_seen_are_reachable", [hex(r) for r in reachable], hex(end_loc))
+        if len(reachable) == 0:
+            return False
+        for loc in reachable:
+            block = self.block_index[loc]
+            
+            retrace_nodes = [block]
+            tally = { }
     
-    intersection = []
+            visited = []
 
-    retrace_nodes = [block]
+            while len(retrace_nodes) > 0:
+                block = retrace_nodes.pop(-1)
+                children = [self.block_index[i] for i in block['children']]
 
-    subgraph_index = {}
-    subgraph_start_block = block
+                tally[block['loc']] = True
+                visited.append(block['loc'])
+                
+                if block['loc'] not in reachable:
+                    print("non-reachable", hex(block['loc']))
+                    return False
 
-    # mark them false as we proceed through, faster than lists
-    tally = { i : True for i in block_index }
+                for c in children:
+                    if c['loc'] not in tally and c not in retrace_nodes and c['loc'] != end_loc:
+                        retrace_nodes.append(c) # push
 
-    while len(retrace_nodes) > 0:
-        curr_block = retrace_nodes.pop(-1)
-        children = [block_index[i] for i in curr_block['children']]
+            # print("visited", [hex(v) for v in visited])
 
-        subgraph_index[curr_block['loc']] = curr_block
+        return True
 
-        tally[curr_block['loc']] = False # visited
 
-        if len(current_block['children']) == 0:
-            continue
+    ## look forward until you find a block through which every other block passes
+    ## Q: why can't another location reach this area?
+    ## A: Because of where we start (namely, the beginning) and the assumption that 
+    ##       this is structured like C code
+    def get_next_meta_block_loc(self, start_loc, end_loc = None):
+        print("get_next_meta_block_loc", hex(start_loc), hex(end_loc) if end_loc is not None else None)
+
+        if start_loc == end_loc:
+            return None
+
+        # if start_loc == 134405328:
+            # print(block_index[134405328])
+            # raise Exception
+
+        intersection = None
         
-        elif current_block['depth'] <= search_depth:
-            intersection.append(current_block['loc'])
-            continue
-        else:
-            for c in children:
-                if tally[c['loc']]: # if it hasn't been visited
-                    retrace_nodes.append(c) # push
+        paths_index = { start_loc : [] } # { dest1 : [src1, src2, ..] , ...}
+        retrace_nodes = [start_loc]
+        loops = { }
+        
+        check = False
+        while intersection is None:
+            
+            count = 0
+
+            while len(retrace_nodes) > 0:
+                loc = retrace_nodes.pop(0)
+                c_locs = self.block_index[loc]['children']
+                p_locs = self.block_index[loc]['parents'] 
+                # this prevents the last block of a loop being marked a loop
+                children_not_already_loops = True
+                for c in c_locs:
+                    children_not_already_loops = children_not_already_loops and (c not in loops)
+                # this is a cheap and faultly check to make sure we aren't the start of a loop
+                # keyfailing: doesn't address loops in loops
+                parents_not_already_loops = True
+                for p in p_locs:
+                    parents_not_already_loops = parents_not_already_loops and (p not in loops)
+                if children_not_already_loops or parents_not_already_loops:
+                    is_loop = self.can_loop(loc)
+                    if is_loop:
+                        loops[loc] = True # prevent loops
+                
+                for c in c_locs:
+                    if c not in loops: 
+                        paths_index[c] = list(set( paths_index[loc] + [loc] +\
+                            (paths_index[c] if c in paths_index else []) ));
+                        
+                        if loc != end_loc: 
+                            retrace_nodes.append(c) # push
+                    else:
+                        print("is loop loc", hex(c))
+
+                count += 1
+                if count > 512:
+                    break
+            
+            retrace_nodes2 = [start_loc]
+            tally2 = { }
     
-    subgraph = { 'index' : subgraph_index, 'start_block' : subgraph_start_block }
+            while len(retrace_nodes2) > 0:
+                loc = retrace_nodes2.pop(0)
+                c_locs = self.block_index[loc]['children']
+                
+                tally2[loc] = True # visited
+                
+                print("checking", hex(loc))
+                print([hex(v) for v in paths_index[loc]])
+                # print("block parents", [hex(p) for p in block_index[loc]['parents']])
+                # print("block children", [hex(c) for c in block_index[loc]['children']])
+
+                if loc not in loops and self.all_seen_are_reachable(paths_index[loc], loc):
+                    intersection = loc
+                    break
+                
+                for c in c_locs:
+                    print('c in c_locs', hex(c))
+                    if c not in retrace_nodes2 and c not in tally2: # if it hasn't been visited
+                        # we can be the end, but not move past the end
+                        if end_loc is not None and loc == end_loc:
+                            pass
+                        else:
+                            retrace_nodes2.append(c) # push
+
+            if len(retrace_nodes) == 0 and not check:
+                # print('pass1')
+                check = True
+            elif len(retrace_nodes) == 0 and check:
+                print("early return")
+                for k in paths_index:
+                    print(hex(k), [hex(v) for v in paths_index[k]])
+                
+                print([hex(k) for k in loops])
+                    
+                return None
+            else:
+                pass
+
+        return intersection
+
+    # def intersection_of(block1, block2, index, end_loc):
+
+        # # print('intersection_of', hex(block1['loc']), hex(block2['loc']) )
+
+        # tally = { }
+
+        # if block1['loc'] != end_loc and block2['loc'] != end_loc:
+            # retrace_nodes = [block1]
+
+            # while len(retrace_nodes) > 0:
+                # block = retrace_nodes.pop(-1)
+                # # print("block1 block", hex(block['loc']))
+                # children = [index[i] for i in block['children']]
+
+                # tally[block['loc']] = True
+
+                # for c in children:
+                    # if c['loc'] not in tally and c['loc'] != end_loc: # if it hasn't been visited
+                        # retrace_nodes.append(c) # push
+
+            # intersection = []
+            
+            # retrace_nodes = [block2]
+            
+            # while len(retrace_nodes) > 0:
+                # block = retrace_nodes.pop(-1)
+                # # print("block2 block", hex(block['loc']))
+                # children = [index[i] for i in block['children']]
+
+                # if block['loc'] in tally:
+                    # intersection.append(block['loc'])
+                # else:
+                    # tally[block['loc']] = True
+
+                # for c in children:
+                    # if c['loc'] not in tally and c['loc'] != end_loc: # if it hasn't been visited
+                        # retrace_nodes.append(c) # push
+            
+            # return intersection
+        # else:
+            # return []
+
+    def can_loop(self, loc):
     
-    print(intersection)
-    if len(intersection) > 0:
-        for i in range(0, len(intersection) - 1):
-            if interesection[i] != intersection[i + 1]:
-                raise Exception
-        return subgraph, intersection[0]
-    else:
-        return subgraph, None
+        print('can_loop', hex(loc))
 
-
-
-def is_bridge(block, block_index, bridge_blocks):
-    print(block)
-
-    if len(block['children']) == 1:
-        child = block['children'][0]
-        child_block = block_index[child]
-        if len(child_block['parents']) == 1:
-            bridge_blocks.append((block['loc'], child))
-
-    return bridge_blocks
-
-# broken
-def reduce_overlap(bridge_blocks):
-    bridge_blocks.sort()
-
-    reduced_bridge_blocks = []
-
-    while len(bridge_blocks) > 1:
-        (start1, end1) = bridge_blocks[0]
-        (start2, end2) = bridge_blocks[1]
-
-        if end1 == start2:
-            bridge_blocks[0] = (start1, end2)
-            bridge_blocks.pop(1)
+        if loc in self.loc_to_loop_start:
+            return True
+        elif loc not in self.not_loop_loc:
+            return False
         else:
-            bridge = bridge_blocks.pop(0)
-            reduced_bridge_blocks.append(bridge)
+            return self.detect_loop(loc)
 
-    reduced_bridge_blocks.append(bridge_blocks.pop(0))
+    def detect_loop(self, start_loc):
+        # we want to first detect all the points in the loop, do this by making a loop path
+        # asserting if it is maximal and then expanding if not maximal.
+        # maximality of a loop is defined by having the set of points in the loop containing 
+        # each points' parent and child nodes as well.
+        # for each point, if the parent is loopable (can reach itself) add it to the set
+        # for each point, if the child is loopable, at it to the set
 
-    return reduced_bridge_blocks
+
+        # determine if we can loop via parents and children and determine if this is the
+        # start of a loop.
+        # i.e., loop starts can only loop via children 
+        #       (loop ends, consequently can only loop via parents)
+        
+        def can_loop(sl):
+            ls = [sl]
+            sn = {}
+
+            while len(ls) > 0:
+                l = ls.pop(-1)
+
+                sn[l] = True
+
+                children_locs = self.block_index[loc]['children']
+
+                for c in children_locs:
+                    # only need one counter-example
+                    if c == sl:
+                        return True
+                    elif c not in sn and c not in ls:
+                        ls.append(c)
+                    else:
+                        pass
+
+            return False
+
+        seen = {}
+        loop_locs = []
+        search_locs = [start_loc]
+
+        while len(search_locs) > 0:
+            loc = search_locs.pop(0)
+
+            if can_loop(loc):
+                loop_locs.append(loc)
+
+            seen[loc] = True
+
+            loop_locs += self.block_index[loc]['children']
+
+        entrance_loc = None
+        exit_loc = None
+
+        if len(loop_locs) == 0:
+            return False
+
+        for loc in loop_locs:
+
+            for p in self.block_index[loc]['parent']:
+                if p not in loop_locs:
+                    entrance_loc = p
+            
+            for c in self.block_index[loc]['children']:
+                if c not in loop_locs:
+                    entrance_loc = c
+
+        if entrance_loc is None or exit_loc is None:
+            raise Exception
+
+        for loc in loop_locs:
+            self.loc_to_loop_start[loc] = entrance_loc
+            self.loc_to_loop_end[loc] = exit_loc
+            self.loc_to_loop_locs[loc] = loop_locs
+
+        return True
 
 def annotate_graph(block_graph):
 
-    start_block = block_graph['start_block']
-    print(start_block)
+    start_loc = block_graph['start_block']['loc']
     block_index = block_graph['index']
 
-    
-    # simultaneously turn the graph in to meta_blocks and reduce those metablocks
-    # using a stack and DFS
-    # the aim is to output a graph with all the syntactic information to output
-    # the instructions within C control flow and print out the conditions correctly
-    # ERRORs if this encounters anything unfamiliar--it doesn't try hard.
-    
-    meta_block_index = {}
-    meta_block_start = start_block
+    mbf = MetaBlockFinder(block_index)
 
-    meta_block_subgraph, subgraph_end_loc = get_next_meta_block_loc(start_block, block_index)
-    meta_block_locs = [(meta_block_subgraph, subgraph_end_loc)]
+    meta_block_index = {}
+    meta_block_start = start_loc
+
+    end_loc = mbf.get_next_meta_block_loc(start_loc)
+    meta_block_locs = [(start_loc, end_loc)]
+
+    while end_loc is not None:
+        start_loc = end_loc
+        end_loc = mbf.get_next_meta_block_loc(start_loc)
+        meta_block_locs.append((start_loc, end_loc))
+
+    # print([(hex(s), hex(e) if e is not None else 0) for (s,e) in meta_block_locs])
+    # raise Exception
+
+    meta_block_locs.reverse()
+    # print([(hex(sg['start_block']['loc']), hex(loc)) for (sg, loc) in meta_block_locs])
 
     seen_locs = {}
+    loops = { }
 
     while len(meta_block_locs) > 0:
-        subgraph, end_loc = meta_block_locs.pop(-1)
+        print("meta_block_locs", [(hex(s),(hex(e) if e is not None else None)) for (s,e) in meta_block_locs])
+        start_loc, end_loc = meta_block_locs.pop(-1)
+    
+        start_block = block_index[start_loc]
 
-        start_block = subgraph['start_block']
+        print("annotate loop", hex(start_loc))
+        # print([hex(p) for p in start_block['parents']])
+        # print([hex(c) for c in start_block['children']])
+        # print(start_block)
 
-        subgraph['end'] = end_loc # type violation, but it'll be handy
-        subgraph_index = subgraph['index']
-        meta_block_loc = start_block['loc']
+        meta_block_loc = start_loc
 
-        seen_locs[start_block['loc']] = True
+        seen_locs[start_loc] = True
+
 
         # proceed the start block forward to the first condition, and fold into `preface`
         # which we'll either switch into another variable if we thing
         # this is something other than an if, if/then, switch (i.e., while or function endings)
         preface = []
 
-        children_locs = start_block['children']
-        children = [subgraph_index[c] for c in children_locs]
+        children_locs = block_index[start_loc]['children']
+        children = [block_index[c] for c in children_locs]
 
+        print("pre-eating", hex(start_loc))
         while len(children) == 1 and len(children[0]['parents']) == 1:
-            preface.append(start_block)
-            start_block = subgraph_index[children[0]['loc']]
-            seen_locs[start_block['loc']] = True
-            children = [subgraph_index[c] for c in start_block['children']]
+            preface.append(start_loc)
+            # print("add to preface", hex(start_block['loc']))
+            start_loc = children_locs[0]
+            print("eating", hex(start_loc))
+            seen_locs[start_loc] = True
+            children_locs = block_index[start_loc]['children']
+            children = [block_index[c] for c in children_locs]
+
+        preface.append(start_loc)
+        seen_locs[start_loc] = True
+
+        # print("loop block", start_block)
 
         if len(children) == 2:
-        # [true, false]
-            if children_locs[0] in seen_locs:
+            have_not_made_meta_block = meta_block_loc not in meta_block_index
+            is_loop = mbf.can_loop(meta_block_loc)
+            have_seen_children = children_locs[0] in seen_locs or children_locs[1] in seen_locs
+            if have_not_made_meta_block and is_loop and not have_seen_children: # children_locs[0] in seen_locs and 
+                print('making while', hex(children_locs[0]), hex(meta_block_loc))
+                curr_loc = meta_block_loc
+                if next_start_loc != end_loc and curr_loc != end_loc:
+                    if  next_start_loc is not None and end_loc is not None:
+                        next_start_loc = mbf.get_next_meta_block_loc(curr_loc, end_loc)
+                        if not (next_start_loc,end_loc) in meta_block_locs and next_block_loc not in seen_locs:
+                            meta_block_locs.append((next_start_loc, end_loc))
+                        # if next_start_loc in seen_locs or (next_start_loc, end_loc) in meta_block_locs:
+                            # raise Exception
                 meta_block_index[meta_block_loc] = {
                             'type' : 'while',
-                            'loc' : children_locs[0],
-                            'end' : meta_block_loc,
-                            'next' : subgraph_end
+                            'inner' : None,
+                            'next' : next_start_loc
                         }
+                loops[meta_block_loc] = True
+                meta_block_locs.append((meta_block_loc, end_loc))
                 #nothing to append since this is handled from the end unlike everything else
-            elif children_locs[1] in seen_locs:
-                # this case will probably be never used given index == 1 corresponds to false branch
-                meta_block_index[meta_block_loc] = {
-                            'type' : 'while',
-                            'loc' : children_loc[1],
-                            'end' : meta_block_loc,
-                            'next' : subgraph_end
-                        }
-                #nothing to append since this is handled from the end unlike everything else
-            else:
-                intersection_points = intersection_of(children[0], children[1], subgraph_end)
-                if len(intersection_points) == 0:
-                    true_loc = children[0]['loc']
-                    false_loc = children[1]['loc']
-                    meta_block_index[meta_block_loc] = {
-                            'type' : 'if',
-                            'loc'  : meta_block_loc,
-                            'cond' : preface,
-                            'true' : true_loc,
-                            'false': false_loc,
-                            'next' : subgraph_end
-                            }
-                    
-                    true_subgraph, true_end_loc = get_next_meta_block_loc(children[0], subgraph_index)
-                    false_subgraph, false_end_loc = get_next_meta_block_loc(children[1], subgraph_index)
-                    meta_block_locs += [(true_subgraph, true_end_loc), (false_subgraph, false_end_loc)]
+            # elif can_loop(children_locs[1], block_index):
+                # print('making while')
+                # # this case will probably be never used given index == 1 corresponds to false branch
+                # meta_block_index[meta_block_loc] = {
+                            # 'type' : 'while',
+                            # 'inner' : None,
+                            # 'next' : end_loc
+                        # }
+                # #nothing to append since this is handled from the end unlike everything else
+            else: # elif children_locs[0] not in seen_locs or children_locs[1] not in seen_locs:
+                # [true, false] == c[0], c[1]
+                # intersection_points = intersection_of(children[0], children[1], block_index, end_loc)
+                
+                # if len(intersection_points) == 0:
+                if True:
+                    curr_loc = meta_block_loc
+                    if end_loc is not None and curr_loc != end_loc:
+                        next_start_loc = mbf.get_next_meta_block_loc(curr_loc, end_loc)
+                        if  next_start_loc is not None and next_start_loc != end_loc:
+                            if not (next_start_loc,end_loc) in meta_block_locs and next_start_loc not in seen_locs:
+                                meta_block_locs.append((next_start_loc, end_loc))
+                            # if next_start_loc in seen_locs or (next_start_loc, end_loc) in meta_block_locs:
+                                # print((hex(next_start_loc), hex(end_loc)))
+                                # raise Exception
+
+                    print("making if", meta_block_loc)
+                    true_loc = children_locs[0]
+                    false_loc = children_locs[1]
+                    print("block tflocs", hex(true_loc), hex(false_loc))
+                    if meta_block_loc in meta_block_index and meta_block_index[meta_block_loc]['type'] == 'while':
+                        meta_block_index[meta_block_loc]['inner'] = {
+                                'type' : 'if',
+                                'loc'  : meta_block_loc,
+                                'cond' : preface,
+                                'true' : true_loc,
+                                'false': false_loc,
+                                'next' : next_start_loc
+                                }
+                    else:
+                        meta_block_index[meta_block_loc] = {
+                                'type' : 'if',
+                                'loc'  : meta_block_loc,
+                                'cond' : preface,
+                                'true' : true_loc,
+                                'false': false_loc,
+                                'next' : next_start_loc
+                                }
+
+                    if true_loc != end_loc:
+                        true_end_loc = mbf.get_next_meta_block_loc(true_loc, end_loc)
+                        if true_loc not in loops and true_end_loc is not None:
+                            meta_block_locs.append((true_loc, end_loc))
+                    if false_loc != end_loc:
+                        false_end_loc = mbf.get_next_meta_block_loc(false_loc, end_loc)
+                        if false_loc not in loops and false_end_loc is not None:
+                            meta_block_locs.append((false_loc, end_loc))
+                        else:
+                            print(false_end_loc)
+                            raise Exception
+
 
 
                 elif len(intersection_points) == 1:
+                    raise Exception
                     # first we want to look to see if there is a premature intersection between branches
                     # that is, if we see an intersection of the two branches before reaching the end block
                     # then if there is a premature intersection, try to treat that as an additional
                     # conjuctive condition (i.e., cond1 || cond2, cond1 && cond2)
                     # get rid of else if it is empty, otherwise we carry out the naive strategy
                     # one conjunction:
-                    #                     ( )                              ( )
-                    #                    _/ \_                            _/ \_
+                    #                      ( )                              ( )
+                    #                     _/ \_                            _/ \_
                     #             true ( )<---( ) false             true ( )--->( ) false
                     #                   |     / \_                        |      \_
                     #               ib ( )  ( )   ( ) t/f            t/f ( )       ( ) ib
                     #                  /     |      \                    /           \
                     #                ...    ...     ...                ...           ...
-                    true_block = children[0]
-                    false_block = children[1]
                     intersection_point = intersection_points[0]
-                    if intersection_point in true_block['children']:
-                        pass
+                    if intersection_point in start_block['children']:
+                        if intersection_point == children_locs[0]: # true
+                            preface.append(children[1]['loc'])
+                            if children[1]['children'][0] != intersection_point: # true
+                                true_loc = children_locs[0]
+                                false_loc = children[1]['children'][0]
+                                meta_block_index[meta_block_loc] = {
+                                            'type' : 'if',
+                                            'loc'  : meta_block_loc,
+                                            'cond' : preface,
+                                            'conj' : 'or',
+                                            'true' : true_loc,
+                                            'false': false_loc, 
+                                            'next' : subgraph_end
+                                        }
+                            elif children[1]['children'][1] != intersection_point: # false
+                                true_loc = children_locs[0]
+                                children[1]['children'][1]
+                                meta_block_index[meta_block_loc] = {
+                                            'type' : 'if',
+                                            'loc'  : meta_block_loc,
+                                            'cond' : preface,
+                                            'conj' : 'or',
+                                            'true' : true_loc,
+                                            'false': false_loc,
+                                            'next' : subgraph_end
+                                        }
+                            else:
+                                raise Exception
+                        else:
+                            preface.append(children[0]['loc'])
+                            if children[0]['children'][0] != intersection_point: # true
+                                true_loc = children[0]['children'][0]
+                                false_loc = children_locs[1]
+                                meta_block_index[meta_block_loc] = {
+                                            'type' : 'if',
+                                            'loc'  : meta_block_loc,
+                                            'cond' : preface,
+                                            'conj' : 'or',
+                                            'true' : true_loc,
+                                            'false': false_loc, 
+                                            'next' : subgraph_end
+                                        }
+                            elif children[1]['children'][1] != intersection_point: # false
+                                true_loc = children[0]['children'][1]
+                                false_loc = children_locs[1]
+                                meta_block_index[meta_block_loc] = {
+                                            'type' : 'if',
+                                            'loc'  : meta_block_loc,
+                                            'cond' : preface,
+                                            'conj' : 'or',
+                                            'true' : true_loc,
+                                            'false': false_loc,
+                                            'next' : subgraph_end
+                                        }
+                            else:
+                                raise Exception
+                        
+                        if children_locs[0] == subgraph_end or children_locs[0] in seen_locs:
+                            meta_block_locs.append((false_subgraph, false_end_loc))
+                        elif children_locs[1] == subgraph_end or children_locs[1] in seen_locs:
+                            meta_block_locs.append((true_subgraph, true_end_loc))
+                        else:
+                            meta_block_locs += [(true_subgraph, true_end_loc), (false_subgraph, false_end_loc)]
                     
-                    elif intersection_point in false_block['children']:
-                        pass
-                    
+                    else:
+                        print("intersections", [hex(i) for i in intersection_points])
+                        print(start_block)
+                        print(children)
+                        raise Exception
                 
                 elif len(intersection_points) > 1:
                     # can't handle this right now
                     raise Exception
-        
+            # else:
+                # raise Exception # how did we get here?
         # switch case
         elif len(children) > 2:
             # TBB for now, so just write out the cases
             pass
         elif len(children) == 1:
-            raise Exception # not sure we should be here
+            print("making block node", hex(meta_block_loc))
+            blocks = preface
+            next_loc = children_locs[0]
+            # print("next_loc", hex(next_loc) if next_loc is not None else None)
+            # print("end_loc", hex(end_loc) if end_loc is not None else None)
+            next_end = None
+            if next_loc != end_loc and end_loc is not None:
+                next_end = mbf.get_next_meta_block_loc(next_loc, end_loc)
+                if next_end != end_loc and next_end is not None:
+                    if next_loc not in seen_locs and (next_loc,end_loc) not in meta_block_locs :
+                        meta_block_locs.append((next_loc, end_loc))
+                    # if next_loc in seen_locs and (next_loc,end_loc) not in meta_block_locs:
+                        # print((hex(next_loc), hex(end_loc)))
+                        # raise Exception
+
+            if next_end is not None:
+                meta_block_index[meta_block_loc] = {
+                            'type' : 'block',
+                            'blocks' : blocks,
+                            'next' : next_loc
+                        }
+
+            else:
+                meta_block_index[meta_block_loc] = {
+                            'type' : 'block',
+                            'blocks' : blocks,
+                            'next' : None
+                        }
+            
+
         elif len(children) == 0:
             end_block = preface
+            meta_block_index[meta_block_loc] = {
+                        'type' : 'end',
+                        'blocks' : preface
+                    }
         else:
             raise Exception
 
-    raise Exception
+    meta_block_graph = { 
+            'index' : block_index, 
+            'meta_block_index': meta_block_index, 
+            'start_block' : meta_block_start 
+            }
+
+    return meta_block_graph
+
+def print_block(block):
+    prefix = b'/*' + bytes(hex(block['loc']), 'utf-8') + b'\n'
+    suffix = b'\n*/\n'
+
+    body = b'\n'.join( [b' '.join(insn) for insn in block['block']] )
+
+    return prefix + body + suffix
+
+def generate_func_cf_from_graph(meta_block_graph):
+    block_index = meta_block_graph['index']
+    meta_index = meta_block_graph['meta_block_index']
+    start = meta_block_graph['start_block']
+
+    seen_locs = {start : True} # prevent loops...
+
+    start_node = meta_index[start]
+
+    def print_base_node(node):
+        out = b''
+        ty = node['type']
+        if ty == 'if':
+            print("if node")
+            cond = node['cond']
+            for c in cond:
+                seen_locs[c] = True
+            cond_out = b''.join( [print_block(block_index[loc]) for loc in cond] )
+
+            true_loc = node['false']
+            false_loc = node['true']
+            print("node tf_locs", hex(true_loc), hex(false_loc))
+            if true_loc == node['next'] or true_loc in seen_locs:
+                true_out = b'if () \n{\n\n}\n'
+            else:
+                seen_locs[true_loc] = True
+                true_out = b'else\n{\n' + print_node(true_loc) + b'\n}\n'
+
+            if false_loc == node['next'] or false_loc in seen_locs:
+                false_out = b''
+            else:
+                seen_locs[false_loc] = True
+                false_out = b'else\n{\n' + print_node(false_loc) + b'\n}\n'
+
+
+            out += (cond_out + true_out + false_out)
+            # if node['next'] != 
+            node_loc = node['next']
+            if node['next'] is not None:
+                print("if node_next:", hex(node_loc))
+            else:
+                print("if end")
+
+        elif ty == 'while':
+            raise Exception # don't think we should come here, but otherwise pass
+            pass
+
+        elif ty == 'block':
+            block_out = b'\n'.join( [print_block(block_index[b]) for b in node['blocks']] )
+
+            out += block_out
+            node_loc = node['next']
+            if node['next'] is not None:
+                print("node block node_next:", hex(node_loc))
+            else:
+                print("node block end")
+
+        elif ty == 'end':
+            end_out = b'\n'.join( [print_block(block_index[b]) for b in node['blocks']] )
+            out += end_out
+            node_loc = None
+        else:
+            print("node", node)
+            print(node['type'])
+            raise Exception
+        return node_loc, out
+
+    def print_node(node_loc):
+        out = b''
+        while node_loc is not None:
+            print("node_loc", hex(node_loc))
+            seen_locs[node_loc] = True
+            node = meta_index[node_loc]
+            ty = node['type']
+            # manually unwrap and progress while, because it uses `inner` which is a meta_block, not loc
+            if ty == 'while':
+                print("while node")
+                inner = node['inner']
+
+                next_loc, out = print_base_node(inner)
+
+                while_out = b'while (1) \n{\n' + out + b'\n}\n'
+
+                out += while_out
+
+                node_loc = next_loc # node['next']
+            else:
+                print("base node")
+                node_loc, out = print_base_node(node)
+
+            if node_loc is not None:
+                print("node next", hex(node_loc))
+            else:
+                print("node end")
+        return out
+
+    return print_node(start)
 
 # default to the RESET location on ARM M4
 def generate_func_cf_asm(binary, entry_point_loc=0x08020004):
@@ -605,13 +1039,16 @@ def generate_func_cf_asm(binary, entry_point_loc=0x08020004):
 
     annotated_graph = annotate_graph(block_graph)
 
+    for k in annotated_graph['meta_block_index']:
+        print(hex(k))
+
     return generate_func_cf_from_graph(annotated_graph)
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser('Provide input and output locations')
     parser.add_argument('input_file', metavar='i', type=str, help="input file")
-    # parser.add_argument('output_file', metavar='o', type=str, help="output file")
+    parser.add_argument('output_file', metavar='o', type=str, help="output file")
     # parser.add_argument('func_loc', metavar='f', type=int, help="location to decompile")
 
     args = parser.parse_args()
@@ -623,3 +1060,7 @@ if __name__ == "__main__":
     f.close()
 
     output = generate_func_cf_asm( binary, 0x08020000 + 0xd630 )
+
+    g = open(args.output_file, 'wb')
+
+    g.write(output)
