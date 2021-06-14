@@ -3407,16 +3407,15 @@ void func_0xD630( int r0, int r1, int r2,  int r3 ) {
          .text:0x0000EF80    F3F7F2FF             bl func_0x2F68; inline void __cdecl( int p1 )
          */
     }
-  } else {
-    /*
-       .text:0x0000EF74 code_0xEF74:
-       .text:0x0000EF74    FDF714FE             bl func_0xCBA0; void __cdecl( int p1, int p2, int p3 )
-       .text:0x0000EF78    1F20                 movs r0, #0x1F
-       .text:0x0000EF7A    F3F7F5FF             bl func_0x2F68; inline void __cdecl( int p1 )
-       .text:0x0000EF7E    2020                 movs r0, #0x20
-       .text:0x0000EF80    F3F7F2FF             bl func_0x2F68; inline void __cdecl( int p1 )
-       */
   }
+  /*
+      .text:0x0000EF74 code_0xEF74:
+      .text:0x0000EF74    FDF714FE             bl func_0xCBA0; void __cdecl( int p1, int p2, int p3 )
+      .text:0x0000EF78    1F20                 movs r0, #0x1F
+      .text:0x0000EF7A    F3F7F5FF             bl func_0x2F68; inline void __cdecl( int p1 )
+      .text:0x0000EF7E    2020                 movs r0, #0x20
+      .text:0x0000EF80    F3F7F2FF             bl func_0x2F68; inline void __cdecl( int p1 )
+      */
   /*
      .text:0x0000EF84 code_0xEF84:
      .text:0x0000EF84    0020                 movs r0, #0x0
