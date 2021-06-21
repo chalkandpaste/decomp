@@ -237,7 +237,7 @@ def reduce_if (i, scope):
             i.iftrue, true_scope = reduce_body(i.iftrue.exprs, scope.copy())
             new_block_items.append(el)
         elif i.iftrue.block_items:
-            i.iftrue.block_items, true_scope = reduce_body(i.iftrue.block_items, scope)
+            i.iftrue.block_items, true_scope = reduce_body(i.iftrue.block_items, scope.copy())
         else:
             true_scope = scope
 
@@ -249,7 +249,7 @@ def reduce_if (i, scope):
             i.iffalse, false_scope = reduce_body(i.iffalse.exprs, scope.copy())
             new_block_items.append(el)
         elif i.iffalse.block_items:
-            i.iffalse.block_items, false_scope = reduce_body(i.iffalse.block_items, scope)
+            i.iffalse.block_items, false_scope = reduce_body(i.iffalse.block_items, scope.copy())
         else:
             false_scope = scope
     else:
@@ -297,7 +297,6 @@ def reduce_switch (s, scope):
         if isinstance(bi, c_ast.Case) or isinstance(bi, c_ast.Default):
             bi.stmts, c_scope = reduce_body(bi.stmts, scope.copy())
             case_scopes.append(c_scope)
-            new_block_items.append(bi)
         else:
             print(bi)
             raise Exception
@@ -324,7 +323,7 @@ def reduce_func (f, scope):
         new_args_exprs = []
         for e in f.args.exprs:
             if isinstance(e, c_ast.ID):
-                if e.name in scope:
+                if e.name in scope and scope[e.name] is not None:
                     e = scope[e.name]
             
             new_args_exprs.append(e)
@@ -395,6 +394,9 @@ def reduce_body (body, scope):
             b = reduce_expr(b, scope)
             new_block_items.append(b)
 
+        elif isinstance(b, c_ast.EmptyStatement):
+            new_block_items.append(b)
+
         else:
             print(b)
             raise Exception
@@ -419,10 +421,17 @@ def reduce_c(raw, fk = False, wk = False):
    
     f = open('scratch/temp.c', 'wb')
     f.write(raw)
+    f.close()
+
     
     ast = parse_file('scratch/temp.c', use_cpp=True)
-
-    body = ast.ext[0].body
+   
+    try:
+        body = ast.ext[0].body
+    except:
+        print(ast)
+        print(ast.ext)
+        raise Exception
 
     ast.ext[0].body.block_items, scope = reduce_body(body.block_items, init_scope.copy())
 

@@ -224,6 +224,9 @@ def liveness_body (body, liveness):
             liveness_expr(b, liveness)
             new_block_items.append(b)
 
+        elif isinstance(b, c_ast.EmptyStatement):
+            new_block_items.append(b)
+
         else:
             print(b)
             raise Exception
@@ -237,6 +240,7 @@ def liveness(raw):
     
     f = open('scratch/temp.c', 'wb')
     f.write(raw)
+    f.close()
     
     ast = parse_file('scratch/temp.c', use_cpp=True)
    

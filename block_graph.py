@@ -1,3 +1,8 @@
+from instruction_buffer import InstructionsBuffer
+from instructions import *
+
+import pickle
+import os.path
 
 # type block_graph
 # {
@@ -105,10 +110,34 @@ def recurse_blocks(block, block_index, f, base_case, direction):
 
     return out
 
+def check_bg_cache(entry_point_loc):
 
-def generate_block_graph(binary, entry_point_loc=0x08020004):
+    fp = 'bgc/' + hex(entry_point_loc)
+    
+    if os.path.isfile(fp):
+        try:
+            return pickle.load(open(fp, 'rb'))
+        except:
+            return None
+    else:
+        return None
 
-    print('generate_block_graph', hex(entry_point_loc))
+def cache_bg(entry_point_loc, block_graph):
+
+    # print('caching')
+    pickle.dump(block_graph, open('bgc/'+hex(entry_point_loc), 'wb'))
+
+def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
+
+    # print('generate_block_graph', hex(entry_point_loc))
+
+    ## CACHING
+    
+    cached_bg = check_bg_cache(entry_point_loc)
+    if cached_bg is not None and use_cache:
+        return cached_bg
+
+    ## END CACHING
 
     insns_buff = InstructionsBuffer(binary, entry_point_loc)
 
@@ -134,7 +163,7 @@ def generate_block_graph(binary, entry_point_loc=0x08020004):
                 if insn[3] in block_end:
                     found_block_end = True
                     break
-                elif insn[3] in func_end + return_void:
+                elif insn[3] in func_end:
                     end_of_function = True
                     # check
                     # 1. if pop/ldmia contains pc (return immmediate)
@@ -240,13 +269,42 @@ def generate_block_graph(binary, entry_point_loc=0x08020004):
 
     block_graph['index'] = recurse_graph(block_graph, update_parents, block_graph['index'], True)
 
+    ## Block cache
+
+    cache_bg(entry_point_loc, block_graph)
+
     return block_graph
+
+def print_block_graph(block_graph):
+    block_index = block_graph['index']
+
+    locs = [k for k in block_index.keys()]
+
+    locs.sort()
+
+    out = []
+
+    for l in locs:
+        block = block_index[l]['block']
+        out += block
+
+    out2 = []
+
+    for i in out:
+        insn = []
+        for j in i:
+            if isinstance(j, bytes):
+                insn.append(j)
+            elif isinstance(j, list):
+                j = [bytes(hex(c), 'utf-8') for c in j]
+                insn.append(b', '.join(j))
+        out2.append(b' '.join(insn))
+    
+    return b'\n'.join(out2)
 
 def generate_asm(binary, entry_point_loc=0x08020004):
 
     block_graph = generate_block_graph(binary, entry_point_loc)
-
-    print([hex(k) for k in block_graph['index'].keys()])
 
     return print_block_graph(block_graph)
 
