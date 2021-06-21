@@ -49,7 +49,8 @@ bgt = [ b'bhi', b'bhi.w', b'bhi.n', b'bpl.n', b'bpl.w', b'bgt', b'bgt.n' ]
 
 cond_block_end = beq + bne + ble + blt + bge + bgt
 
-fucking_shit = [ b'blx', b'bx' ]
+exchange_return = [ b'bx' ]
+exchange_func_call = [ b'blx' ] 
 
 uncond_block_end = [ b'b', b'b.n',b'b.w' ]
 
@@ -64,9 +65,9 @@ sub = [ b'sub', b'sub.w', b'subs', b'subs.w', b'vsub.f32' ]
 rsb = [ b'rsb', b'rsb.w', b'rsbs', b'negs' ]
 aand = [ b'and', b'and.w', b'ands.w', b'ands', b'ands.n' ]
 orr = [ b'orr', b'orr.w', b'orrs', b'orrs.w' ]
-bic = [ b'bic', b'bic.w', b'bics', ]
+bic = [ b'bic', b'bic.w', b'bics', b'bics.w' ]
 shift_right = [ b'lsrs', b'asrs', b'lsr.w', b'lsr' ]
-shift_left = [ b'lsls' ]
+shift_left = [ b'lsls', b'lsl.w' ]
 base_arith = add + sub + rsb + aand + orr + bic + shift_right + shift_left
 
 mul = [ b'vmul.f32', b'muls', b'smulbb', b'smulbt', b'smultt', b'smultb', b'mul.w' ]
@@ -83,13 +84,13 @@ cast_to_uint = [ b'vcvt.u32.f32', b'uxth', b'uxth.w', b'uxtb',  ]
 
 cast = cast_to_float + cast_to_int + cast_to_uint
 
-bits = [ b'ubfx', b'bfc' ]
+bits = [ b'ubfx', b'bfc', b'bfi' ]
 
 sxtab = [ b'sxtab', b'sxtah' ]
 
 
 moves = [ b'mov', b'movw', b'movs', b'movs.w',  b'vmov.f32', b'mov.w', b'vmov', b'vmrs'] 
-n_moves = [ b'mvn', b'mvn.w' ]
+n_moves = [ b'mvn', b'mvn.w', b'mvns' ]
 move = moves + n_moves
 
 cond_branch = cond_block_end + cond_block_end_zero + tbb

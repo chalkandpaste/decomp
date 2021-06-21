@@ -115,10 +115,7 @@ def check_bg_cache(entry_point_loc):
     fp = 'bgc/' + hex(entry_point_loc)
     
     if os.path.isfile(fp):
-        try:
-            return pickle.load(open(fp, 'rb'))
-        except:
-            return None
+        return pickle.load(open(fp, 'rb'))
     else:
         return None
 
@@ -128,8 +125,7 @@ def cache_bg(entry_point_loc, block_graph):
     pickle.dump(block_graph, open('bgc/'+hex(entry_point_loc), 'wb'))
 
 def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
-
-    # print('generate_block_graph', hex(entry_point_loc))
+    print('generate_block_graph', hex(entry_point_loc))
 
     ## CACHING
     
@@ -150,6 +146,7 @@ def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
         search_locs.sort()
         search_loc = search_locs.pop(0)
 
+        # print('making block_node', hex(search_loc))
 
         end_of_function = False
         found_block_end = False
@@ -163,7 +160,7 @@ def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
                 if insn[3] in block_end:
                     found_block_end = True
                     break
-                elif insn[3] in func_end:
+                elif insn[3] in func_end + exchange_return:
                     end_of_function = True
                     # check
                     # 1. if pop/ldmia contains pc (return immmediate)
@@ -228,7 +225,6 @@ def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
             # we are fine and won't loop
             # raise Exception
 
-
     # Because we only did a forward pass and some blocks end without a block_end
     # we need to do a backwards pass to trim overlapping blocks
 
@@ -262,7 +258,6 @@ def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
 
             if block['loc'] not in child['parents']:
                 child['parents'].append(block['loc'])
-                # print(child)
                 block_index[child_loc] = child
 
         return block_index
@@ -270,7 +265,7 @@ def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
     block_graph['index'] = recurse_graph(block_graph, update_parents, block_graph['index'], True)
 
     ## Block cache
-
+    
     cache_bg(entry_point_loc, block_graph)
 
     return block_graph

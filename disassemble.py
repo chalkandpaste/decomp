@@ -69,7 +69,7 @@ class MetaBlockFinder(LoopTracker):
     ## A: Because of where we start (namely, the beginning) and the assumption that 
     ##       this is structured like C code
     def get_next_meta_block_loc(self, start_loc, end_loc = None):
-        # print("get_next_meta_block_loc", hex(start_loc), hex(end_loc) if end_loc is not None else None)
+        print("get_next_meta_block_loc", hex(start_loc), hex(end_loc) if end_loc is not None else None)
 
         if start_loc == end_loc:
             return end_loc
@@ -92,9 +92,10 @@ class MetaBlockFinder(LoopTracker):
                 loc = retrace_nodes.pop(0)
                 c_locs = self.block_index[loc]['children']
 
+
                 if self.is_loop_start(loc) and loc not in seen_loops:
                     seen_loops[loc] = True
-                
+
                 for c in c_locs:
                     if c not in seen_loops: 
                         paths_index[c] = list(set( paths_index[loc] + [loc] +\
@@ -103,37 +104,42 @@ class MetaBlockFinder(LoopTracker):
                         if self.is_loop_start(c):
                             seen_loops[c] = True
                         
-                        if loc != end_loc: 
+                        if loc != end_loc: # and c not in seen_loops:
                             retrace_nodes.append(c) # push
 
                 count += 1
-                if count > 512:
+                if count > 1024:
                     break
             
             retrace_nodes2 = [start_loc]
             tally2 = { }
-            try: 
-        
+            seen_loops2 = {}
+            try:
                 while len(retrace_nodes2) > 0:
                     loc = retrace_nodes2.pop(0)
                     c_locs = self.block_index[loc]['children']
                     
                     tally2[loc] = True # visited
                     
-                    # print("checking", hex(loc))
+                    print("checking", hex(loc))
                     # print([hex(v) for v in paths_index[loc]])
 
-                    if loc not in seen_loops and self.all_seen_are_reachable(paths_index[loc], loc):
+                    
+                    if not self.is_loop_start(loc) and not self.is_loop_end(loc) and self.all_seen_are_reachable(paths_index[loc], loc):
                         if len(c_locs) != 1 or len(self.block_index[c_locs[0]]['parents']) != 1:
                             intersection = loc
                             break
-                    
+                
+                    if loc in seen_loops and loc not in seen_loops2:
+                        seen_loops2[loc] = True
+
                     if end_loc is None or loc != end_loc:
                         for c in c_locs:
-                            if c not in retrace_nodes2 and c not in tally2: # if it hasn't been visited
+                            if c not in retrace_nodes2 and c not in tally2 and not self.is_loop_start(c): # if it hasn't been visited
                                 # TODO check for end blocks?
                                 retrace_nodes2.append(c) # push
             except:
+                # print('exception1')
                 continue
             if len(retrace_nodes) == 0 and not check:
                 # print('pass1')
@@ -153,6 +159,7 @@ class MetaBlockFinder(LoopTracker):
 
 
 def annotate_graph(block_graph):
+    print('annotate_graph', hex(block_graph['start_block']['loc']))
 
     start_loc = block_graph['start_block']['loc']
     block_index = block_graph['index']
@@ -474,7 +481,7 @@ def simplify_if(meta_block_graph):
                     node['cond'] += true_node['cond']
                     node['false'] = child_false_loc
                     node['conj'] += [b' && '] + [b' && ' if c == b' || ' else b' || ' for c in true_node['conj']]
-                    node['flag'] = node['flag'] + true_node['flag']
+                    node['flag'] = node['flag'] + true_node['flag'].copy()
                     # repeat this until there are no simplifications
                     node_loc = node['loc']
                 elif child_next_loc is None and child_false_loc == false_loc:
@@ -482,7 +489,7 @@ def simplify_if(meta_block_graph):
                     node['cond'] += true_node['cond']
                     node['false'] = child_true_loc
                     node['conj'] += [b' && '] + true_node['conj']
-                    node['flag'] = node['flag'] + true_node['flag']
+                    node['flag'] = node['flag'] + true_node['flag'].copy()
                     
                     # repeat this until there are no simplifications
                     node_loc = node['loc']
@@ -862,6 +869,7 @@ def generate_func_decl(block_graph):
 
 # default to the RESET location on ARM M4
 def generate_func_cf_asm(binary, entry_point_loc=0x08020004):
+    print('generate_func_cf_asm', hex(entry_point_loc))
 
     func_sigs = generate_func_sigs(binary, entry_point_loc)
 
@@ -886,7 +894,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser('Provide input and output locations')
     parser.add_argument('input_file', metavar='i', type=str, help="input file")
     parser.add_argument('output_file', metavar='o', type=str, help="output file")
-    # parser.add_argument('func_loc', metavar='f', type=int, help="location to decompile")
+    parser.add_argument('func_loc', metavar='f', type=str, help="location to decompile")
+
 
     args = parser.parse_args()
 
@@ -895,8 +904,10 @@ if __name__ == "__main__":
     binary = f.read()
 
     f.close()
+    
+    loc = int(args.func_loc, 0)
 
-    output = generate_func_cf_asm( binary, 0x08020000 + 0xa4f4 )
+    output = generate_func_cf_asm( binary, loc )
     # output = generate_asm( binary, 0x08020000 + 0xa4f4 )
 
     g = open(args.output_file, 'wb')

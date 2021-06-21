@@ -7,7 +7,7 @@ skip_functions = [ 134469972, 134471256, 134469472, 134471424, 134472782, 134455
             0x8020298, 0x80205d6, 0x802fe84, 0x8020ccc, 0x8020334, 0x8020f24, 0x8020c40, 0x8021470, 0x8021340,
             0x8021008, 0x803e2a4, 0x803e3ea, 0x803d870, 0x8020c38, 0x8020694, 0x8020c30, 0x803c29c,
             0x802f708, 0x802054c, 0x803dd04, 0x803df6c, 0x803e2f0, 0x803d778, 0x803e11c, 0x803a178,
-            0x8020748, 
+            0x8020748, 0x803c6ea, 0x8022610 
             ] 
             # 0x8020f24, 0x8020d4c, 0x8020c38, 0x803df84, 0x8020334, 0x8020c30, 0x8020ccc, 0x8020748, 0x802fe84,
             # 0x803c29c, 0x803adc8, 0x803d7dc, 0x803af48, 0x803af28, 0x8020688, 0x803c222, 0x803d440, 0x803aec0,
@@ -77,6 +77,7 @@ def collect_functions(block_graph):
 def get_function_signature(block_graph):
     start_block = block_graph['start_block']
     block_index = block_graph['index']
+    print('get_function_signature', hex(start_block['loc']))
 
     loop_tracker = LoopTracker(block_index)
     loops = {}
@@ -259,7 +260,7 @@ def get_function_signature(block_graph):
                     print(insn)
                     raise Exception
             elif insn[0] in compares + tst:
-                if len(insn) == 3:
+                if len(insn) == 3 or len(insn) == 5:
                     reg_kill1 = crs(insn[1])
                     reg_kill2 = crs(insn[2])
                     if reg_kill1 in scope:
@@ -277,7 +278,7 @@ def get_function_signature(block_graph):
                         scope[reg_kill] = False
                 else:
                     raise Exception
-            elif insn[0] in func_start + func_end + func_call + uncond_block_end + vpop + cond_block_end + tbb + nop + fucking_shit: # ignore
+            elif insn[0] in func_start + func_end + func_call + uncond_block_end + vpop + cond_block_end + tbb + nop + exchange_return + exchange_func_call: # ignore
                 pass
             else:
                 print(i)
@@ -499,7 +500,7 @@ def get_function_signature(block_graph):
                     print(insn)
                     raise Exception
             elif insn[0] in compares + tst:
-                if len(insn) == 3:
+                if len(insn) == 3 or len(insn) == 5:
                     reg_alive1 = crs(insn[1])
                     reg_alive2 = crs(insn[2])
                     if reg_alive1 in scope:
@@ -517,7 +518,7 @@ def get_function_signature(block_graph):
                         scope[reg_alive] = True
                 else:
                     raise Exception
-            elif insn[0] in func_start + func_end + func_call + uncond_block_end + vpop + cond_block_end + tbb + nop + fucking_shit: # ignore
+            elif insn[0] in func_start + func_end + func_call + uncond_block_end + vpop + cond_block_end + tbb + nop + exchange_return + exchange_func_call: # ignore
                 pass
             else:
                 print(i)

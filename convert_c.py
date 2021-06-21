@@ -84,7 +84,7 @@ def convert_instruction(insn):
             return func_call(insn)
         else:
             return b''
-    elif insn[0] in ns.fucking_shit + ns.vpop + ns.cond_block_end + ns.cond_block_end_zero + ns.block_end_start + ns.func_end + ns.nop + ns.tbb + ns.func_start: ## ignore
+    elif insn[0] in ns.exchange_return + ns.exchange_func_call + ns.vpop + ns.cond_block_end + ns.cond_block_end_zero + ns.block_end_start + ns.func_end + ns.nop + ns.tbb + ns.func_start: ## ignore
         return empty()
     else:
         print(insn)
@@ -173,8 +173,10 @@ def shift_left(i):
         raise Exception
 
 def shift_right(i):
-    if len(i) == 4:
-        return i[1] + b' = ' + i[-2] + b' >> ' + i[-1]
+    if len(i) == 3:
+        return i[1] + b' = ' + i[1] + b' >> ' + i[2]
+    elif len(i) == 4:
+        return i[1] + b' = ' + i[2] + b' >> ' + i[3]
     else:
         print(i)
         raise Exception

@@ -8,19 +8,26 @@ class LoopTracker:
         self.not_loop_loc = {} # locs which are not in a loop
 
     def is_loop_start(self, loc):
+        # print('is_loop_start', hex(loc))
         if loc in self.loc_to_loop_start:
-            if loc == self.loc_to_loop_start[loc]:
-                return True
-            else:
-                return False
+            return loc == self.loc_to_loop_start[loc]
         elif loc in self.not_loop_loc:
             return False
         else:
             self.detect_loop(loc)
-            if loc in self.loc_to_loop_start and loc == self.loc_to_loop_start[loc]:
-                return True
-            else:
-                return False
+            if loc in self.loc_to_loop_start:
+                return loc == self.loc_to_loop_start[loc]
+    
+    def is_loop_end(self, loc):
+        # print('is_loop_end', hex(loc))
+        if loc in self.loc_to_loop_end:
+            return loc == self.loc_to_loop_end[loc]
+        elif loc in self.not_loop_loc:
+            return False
+        else:
+            self.detect_loop(loc)
+            if loc in self.loc_to_loop_end:
+                return loc == self.loc_to_loop_end[loc]
     
     def get_loop_end(self, loc):
         if loc in self.loc_to_loop_end:
@@ -110,10 +117,9 @@ class LoopTracker:
 
             while len(ls) > 0:
                 l = ls.pop(-1)
-
                 sn[l] = True
 
-                children_locs = self.block_index[l]['children']
+                children_locs = [c for c in self.block_index[l]['children']]
 
                 for c in children_locs:
                     # only need one counter-example
@@ -152,7 +158,7 @@ class LoopTracker:
                     self.not_loop_loc[loc] = True
 
 
-            children_locs = self.block_index[loc]['children']
+            children_locs = [c for c in self.block_index[loc]['children']]
             # print('children_locs', [hex(c) for c in children_locs])
 
 
@@ -185,8 +191,14 @@ class LoopTracker:
                 if c not in loop_locs:
                     exit_loc = loc
         
-        # print("entrance_loc pre-check", hex(entrance_loc) if entrance_loc is not None else None)
-        
+        # odd case of being a function end (i.e., loop with no return)
+        # if exit_loc is None:
+            # for loc in loop_locs:
+                # c_locs = self.block_index[loc]['children']
+                # if len(c_locs) == 1 and (c_locs[0] == entrance_loc): # or entrance_loc is None): 
+                    # exit_loc = loc
+
+
         # odd case of being a function start
         if entrance_loc is None:
             for loc in loop_locs:

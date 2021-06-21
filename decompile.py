@@ -27,6 +27,8 @@ if __name__ == "__main__":
     search_locs = [main_func]
     funcs = [main_func]
 
+    cf_misses = []
+
     while len(search_locs) > 0:
         loc = search_locs.pop(0)
         block_graph = generate_block_graph(binary, loc)
@@ -49,11 +51,10 @@ if __name__ == "__main__":
             cf_out_file.write(cf_output)
         except:
             print('fucked up in cf', hex(f))
+            cf_misses.append(f)
             continue 
         
         c_output = convert(cf_output)
-        print('c_output')
-        print(c_output)
         c_out_file = open(c_dir + hex(f) + '_d.c', 'wb')
         c_out_file.write(c_output)
         
@@ -65,4 +66,5 @@ if __name__ == "__main__":
         fin_out_file = open(c_dir + hex(f) + '.c', 'wb')
         fin_out_file.write(fin_c_output)
 
-        
+    for f in cf_misses:
+        print("missed:", hex(f))
