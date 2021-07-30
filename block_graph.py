@@ -3,6 +3,7 @@ from instructions import *
 
 import pickle
 import os.path
+import argparse
 
 # type block_graph
 # {
@@ -124,7 +125,7 @@ def cache_bg(entry_point_loc, block_graph):
     # print('caching')
     pickle.dump(block_graph, open('bgc/'+hex(entry_point_loc), 'wb'))
 
-def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
+def generate_block_graph(binary, entry_point_loc, use_cache=True, override_input=None):
     print('generate_block_graph', hex(entry_point_loc))
 
     ## CACHING
@@ -134,8 +135,11 @@ def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
         return cached_bg
 
     ## END CACHING
-
-    insns_buff = InstructionsBuffer(binary, entry_point_loc)
+    
+    if override_input is None:
+        insns_buff = InstructionsBuffer(binary, entry_point_loc)
+    else:
+        insns_buff = override_input
 
     block_graph = {'index' : {}, 'start_block': None}
 
@@ -153,14 +157,26 @@ def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
         block = []
 
         if search_loc not in block_graph['index']:
-            insns = insns_buff.read_insns_at_loc(search_loc)
+            if override_input is None:
+                insns = insns_buff.read_insns_at_loc(search_loc)
+            else:
+                try:
+                    insns_indexer = {int(insn[0],0) : i for (i,insn) in enumerate(insns_buff)}
+                    index = insns_indexer[search_loc]
+                    insns = insns_buff[index:]
+                except:
+                    print(insns_indexer)
+                    raise Exception
+
             for i in range(len(insns)):
                 insn = insns[i]
                 block.append(insn)
                 if insn[3] in block_end:
                     found_block_end = True
+                    print('block end', insn)
                     break
                 elif insn[3] in func_end + exchange_return:
+                    print('func end', insn)
                     end_of_function = True
                     # check
                     # 1. if pop/ldmia contains pc (return immmediate)
@@ -168,6 +184,8 @@ def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
                     #        and the go ahead until pc-altering instruction occurs
                     if b'pc,' in insn[5:] or b'pc}' in insn[4:] or b'{pc}' in insn[4:]:
                         break
+                    elif insn[3] == b'bx' and insn[4] == b'lr':
+                        break # return void case
                     elif b'lr,' in insn[5:] or b'lr}' in insn[4:]:
                         tail_end = []
                         j = 1
@@ -180,8 +198,6 @@ def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
                                 j += 1
                         block += tail_end
                         break
-                    elif insn[3] == b'bx' and insn[4] == b'lr':
-                        break # return void case
                     elif insn[3] == b'pop' and not (b'pc,' in insn[5:] or b'pc}' in insn[4:] or b'{pc}' in insn[4:]) or not (b'lr,' in insn[5:] or b'lr}' in insn[4:]):
                         end_of_function = False
                         pass
@@ -216,7 +232,9 @@ def generate_block_graph(binary, entry_point_loc=0x08020004, use_cache=True):
 
             block_graph['index'][search_loc] = new_block
 
-            search_locs += children
+            for c in children:
+                if c not in search_locs:
+                    search_locs.append(c)
 
 
         else:
@@ -297,9 +315,9 @@ def print_block_graph(block_graph):
     
     return b'\n'.join(out2)
 
-def generate_asm(binary, entry_point_loc=0x08020004):
+def generate_asm(binary, entry_point_loc, cache=True, override=None):
 
-    block_graph = generate_block_graph(binary, entry_point_loc)
+    block_graph = generate_block_graph(binary, entry_point_loc, cache, override)
 
     return print_block_graph(block_graph)
 
@@ -308,17 +326,35 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser('Provide input and output locations')
     parser.add_argument('input_file', metavar='i', type=str, help="input file")
     parser.add_argument('output_file', metavar='o', type=str, help="output file")
+    parser.add_argument('entry_loc', metavar='e', type=str, help="entry_loc")
     # parser.add_argument('func_loc', metavar='f', type=int, help="location to decompile")
 
     args = parser.parse_args()
 
+    entry_loc = int(args.entry_loc, 0)
+
     f = open(args.input_file, 'rb')
 
-    binary = f.read()
+    override_input = [l.split(b' ') for l in f.read().split(b'\n')]
+    override_input = [l for l in override_input if l != [ b'' ]]
+    override_input2 = []
+    for l in override_input:
+        if l[3] == b'tbb':
+            insn = l[0:6]
+            locs = [int(i.rstrip(b','),0) for i in l[6:-1]]
+            insn.append(locs)
+
+            print(insn)
+        else:
+            insn = l
+
+        override_input2.append(insn)
+
+    override_input = override_input2
 
     f.close()
 
-    output = generate_asm( binary, 0x08020000 + 0xa4f4 )
+    output = generate_asm( None, entry_loc, False, override_input)
 
     g = open(args.output_file, 'wb')
 

@@ -101,10 +101,10 @@ class MetaBlockFinder(LoopTracker):
                         paths_index[c] = list(set( paths_index[loc] + [loc] +\
                             (paths_index[c] if c in paths_index else []) ));
                     
-                        if self.is_loop_start(c):
-                            seen_loops[c] = True
+                        # if self.is_loop_start(c):
+                            # seen_loops[c] = True
                         
-                        if loc != end_loc: # and c not in seen_loops:
+                        if loc != end_loc and not (self.is_loop_start(c) and c in seen_loops) and c not in retrace_nodes:
                             retrace_nodes.append(c) # push
 
                 count += 1
@@ -112,32 +112,33 @@ class MetaBlockFinder(LoopTracker):
                     break
             
             retrace_nodes2 = [start_loc]
-            tally2 = { }
             seen_loops2 = {}
             try:
                 while len(retrace_nodes2) > 0:
                     loc = retrace_nodes2.pop(0)
                     c_locs = self.block_index[loc]['children']
                     
-                    tally2[loc] = True # visited
-                    
-                    print("checking", hex(loc))
+                    # print("checking", hex(loc))
                     # print([hex(v) for v in paths_index[loc]])
-
                     
-                    if not self.is_loop_start(loc) and not self.is_loop_end(loc) and self.all_seen_are_reachable(paths_index[loc], loc):
-                        if len(c_locs) != 1 or len(self.block_index[c_locs[0]]['parents']) != 1:
+                    if not self.is_loop_start(loc) and\
+                            not self.is_loop_end(loc) and\
+                            self.all_seen_are_reachable(paths_index[loc], loc) and\
+                            not (self.get_loop_start(loc) in seen_loops2 and self.can_loop(loc)):
+                        if not (len(c_locs) == 1 and len(self.block_index[c_locs[0]]['parents']) == 1):
                             intersection = loc
                             break
                 
                     if loc in seen_loops and loc not in seen_loops2:
+                        # promote to a seen loop for this cycle
                         seen_loops2[loc] = True
 
-                    if end_loc is None or loc != end_loc:
+                    if loc != end_loc: # end_loc is not None and 
                         for c in c_locs:
-                            if c not in retrace_nodes2 and c not in tally2 and not self.is_loop_start(c): # if it hasn't been visited
-                                # TODO check for end blocks?
-                                retrace_nodes2.append(c) # push
+                            if c not in retrace_nodes2 and\
+                                not (c in seen_loops2 and self.is_loop_start(c)):
+                                    retrace_nodes2.append(c) # push
+            
             except:
                 # print('exception1')
                 continue
@@ -192,7 +193,7 @@ def annotate_graph(block_graph):
     
         start_block = block_index[start_loc]
 
-        # print("annotate loop", hex(start_loc))
+        print("annotate loop", hex(start_loc))
 
         meta_block_loc = start_loc
 
@@ -225,23 +226,23 @@ def annotate_graph(block_graph):
         if len(children) == 2:
             have_not_made_meta_block = meta_block_loc not in meta_block_index
             # print('have not made', have_not_made_meta_block)
-            is_loop = mbf.can_loop(meta_block_loc)
+            is_loop = mbf.is_loop_start(meta_block_loc)
             # print('is_loop', is_loop)
             have_seen_children = (children_locs[0] in seen_locs or children_locs[1] in seen_locs) and\
                     (meta_block_loc != children_locs[1] and meta_block_loc != children_locs[0]) # loop of 1 block
             # print('have_seen_children', have_seen_children)
             if have_not_made_meta_block and is_loop and not have_seen_children: # children_locs[0] in seen_locs and 
-                # print('making while', hex(children_locs[0]), hex(meta_block_loc))
+                print('making while', hex(meta_block_loc))
                 loop_end_loc = mbf.get_loop_end(meta_block_loc)
                 seen_locs[loop_end_loc] = True
-                # print('loop_end_loc', hex(loop_end_loc))
+                print('loop_end_loc', hex(loop_end_loc))
                 next_start_loc = mbf.get_next_meta_block_loc(loop_end_loc, end_loc)
                 if next_start_loc is not None:
                     if not (next_start_loc, end_loc) in meta_block_locs and next_start_loc not in seen_locs:
                         meta_block_locs.append((next_start_loc, end_loc))
                     elif next_start_loc in seen_locs:
                         next_start_loc = None
-                # print('next_start_loc', hex(next_start_loc) if next_start_loc is not None else None)
+                print('next_start_loc', hex(next_start_loc) if next_start_loc is not None else None)
 
                 meta_block_index[meta_block_loc] = {
                             'type' : 'while',
@@ -256,7 +257,7 @@ def annotate_graph(block_graph):
                 # [true, false] == c[0], c[1]
                 
                 if meta_block_loc != mbf.get_loop_end(meta_block_loc):
-                    # print("making if", hex(meta_block_loc))
+                    print("making if", hex(meta_block_loc))
                     
                     next_start_loc = None
                     # if the end_loc is None we are at the end so may be true/false but no "nexts"
@@ -296,7 +297,7 @@ def annotate_graph(block_graph):
                     true_loc = None
                     false_loc = None
                     
-                    # print("block temp tflocs", hex(temp_true_loc), hex(temp_false_loc))
+                    print("block temp tflocs", hex(temp_true_loc), hex(temp_false_loc))
                     if temp_true_loc != child_end_loc:
                         if temp_true_loc not in loops:
                             true_end_loc = mbf.get_next_meta_block_loc(temp_true_loc, child_end_loc)
@@ -320,10 +321,10 @@ def annotate_graph(block_graph):
                                     if (false_loc, false_end_loc) not in meta_block_locs:
                                         meta_block_locs.append((false_loc, child_end_loc))
                    
-                    # print("true_loc, false_loc, next_start_loc", 
-                            # hex(true_loc) if true_loc is not None else None,
-                            # hex(false_loc) if false_loc is not None else None,
-                            # hex(next_start_loc) if next_start_loc is not None else None)
+                    print("true_loc, false_loc, next_start_loc", 
+                            hex(true_loc) if true_loc is not None else None,
+                            hex(false_loc) if false_loc is not None else None,
+                            hex(next_start_loc) if next_start_loc is not None else None)
                     if meta_block_loc in meta_block_index and meta_block_index[meta_block_loc]['type'] == 'while':
                         meta_block_index[meta_block_loc]['inner'] = {
                                 'type' : 'if',
@@ -364,7 +365,7 @@ def annotate_graph(block_graph):
                     }
 
         elif len(children) == 1:
-            # print("making block node", hex(meta_block_loc))
+            print("making block node", hex(meta_block_loc))
 
             blocks = preface
             
@@ -396,9 +397,9 @@ def annotate_graph(block_graph):
                         # print((hex(next_loc), hex(end_loc)))
                         # raise Exception
 
-            # print('next_loc', hex(next_loc) if next_loc is not None else None)
-            # print('next_end', hex(next_end) if next_end is not None else None)
-            # print('end_loc', hex(end_loc) if end_loc is not None else None)
+            print('next_loc', hex(next_loc) if next_loc is not None else None)
+            print('next_end', hex(next_end) if next_end is not None else None)
+            print('end_loc', hex(end_loc) if end_loc is not None else None)
 
             if next_end is not None or (next_end is None and end_loc is None):
                 meta_block_index[meta_block_loc] = {
@@ -636,18 +637,24 @@ def print_if_cond(cond, conj, flags, block_index):
 
                 for j in range(i, len(insns)):
                     insn_1 = insns[j]
-                    if insn_1[3] in compare + ncompare:
+                    if insn_1[3] in compare + ncompare + tst:
                         comp_reg1 = insn_1[4].rstrip(b',')
                         comp_reg2 = insn_1[5].lstrip(b'#').rstrip(b',')
+                        comp = insn_0[3]
+                        break
+                    elif insn_1[3] in modifies_NCVZ:
+                        comp_reg1 = crs(insn_1[4])
+                        comp_reg2 = b'0'
                         comp = insn_0[3]
                         break
                     
                 nzcv_set = None
                 # try for floating point
                 if comp is None:
-
+                    print('try floating point')
                     for j in range(i, len(insns)):
                         insn_1 = insns[j]
+                        print(insn_1)
                     
                         if insn_1[3] == b'vmrs' and insn_1[4] == b'APSR_nzcv,' and insn_1[5] == b'fpscr':
                             nzcv_set = True
@@ -767,6 +774,7 @@ def generate_func_cf_from_graph(meta_block_graph):
 
         elif ty == 'end':
             end_out = b'\n'.join( [print_block(block_index[b]) for b in node['blocks']] )
+            end_out += b'\nreturn;\n'
             out += end_out
             node_loc = None
         elif ty == 'tbb':
@@ -800,8 +808,10 @@ def generate_func_cf_from_graph(meta_block_graph):
                 inner = node['inner']
                 cond = node['cond']
                 while_out = print_node(inner)
-                cond_out = print_block(block_index[cond]) # print_base_node(cond)
-                while_out = b'while (1) \n{\n' + while_out + cond_out + b'\n}\n'
+                cond_out,cond_expr = print_if_cond([cond], [], [True], block_index)
+                while_out = b'while (1) \n{\n' + while_out + cond_out +\
+                        b'if ( ' + cond_expr + b' ) {\n break;\n }\n' +\
+                        b'\n}\n'
                 out += while_out
                 
                 node_loc = node['next']

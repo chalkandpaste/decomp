@@ -10,8 +10,9 @@ load_u16 = [ b'ldrh', b'ldrh.w' ]
 load_s16 = [ b'ldrsh', b'ldrsh.w' ]
 load_u8 = [ b'ldrb', b'ldrb.w' ]
 load_s8 = [ b'ldrsb', b'ldrsb.w' ]
+load_weird = [ b'ldr??.w' ]
 
-load = load_fp + load_u32 + load_u16 + load_s16 + load_u8 + load_s8
+load = load_fp + load_u32 + load_u16 + load_s16 + load_u8 + load_s8 + load_weird
 
 load_d = [ b'ldrd', b'ldrd.n', b'ldrd.w' ]
 
@@ -30,10 +31,11 @@ vpop = [b'vpop'] # treated differently
 compare = [ b'cmp',   b'cmp.w' ]
 ncompare = [ b'cmn', b'cmn.w', b'cmn.n' ]
 fp_compare = [ b'vcmpe.f32' ]
+tst = [ b'tst', b'tst.w', b'tst.n' ]
 
-compares = compare + ncompare + fp_compare
+compares = compare + ncompare + fp_compare + tst
 
-block_end_start = compare + fp_compare
+block_end_start = compare + fp_compare + tst
 
 cond_block_end_zero = [ b'cbnz', b'cbz' ]
 
@@ -44,10 +46,11 @@ beq = [ b'beq', b'beq.n', b'beq.w' ]
 bne = [ b'bne', b'bne.w', b'bne.n' ]
 ble = [ b'bls', b'bls.w', b'bls.n', b'ble', b'ble.w', b'ble.n' ] 
 blt = [ b'blt', b'blt.n', b'blt.w' , b'blo', b'blo.n', b'blo.w', b'bcc', b'bcc.n', b'bcc.w', b'bmi', b'bmi.w', b'bmi.n']
-bge = [ b'bhs', b'bhs.w', b'bhs.n', b'bcs', b'bcs.w', b'bcs.n', b'bge', b'bge.w', b'bge.n' ]
-bgt = [ b'bhi', b'bhi.w', b'bhi.n', b'bpl.n', b'bpl.w', b'bgt', b'bgt.n' ] 
+bge = [ b'bhs', b'bhs.w', b'bhs.n', b'bcs', b'bcs.w', b'bcs.n', b'bge', b'bge.w', b'bge.n', b'bpl', b'bpl.n', b'bpl.w' ]
+bgt = [ b'bhi', b'bhi.w', b'bhi.n',  b'bgt', b'bgt.n' ] 
 
 cond_block_end = beq + bne + ble + blt + bge + bgt
+
 
 exchange_return = [ b'bx' ]
 exchange_func_call = [ b'blx' ] 
@@ -59,6 +62,8 @@ tbb = [b'tbb', b'tbb.n', b'tbb.w', b'tbh', b'tbh.n', 'tbh.w']
 branch = cond_block_end + uncond_block_end + cond_block_end_zero + tbb
 
 block_end = cond_block_end + cond_block_end_zero + uncond_block_end + tbb
+
+cond_branch = cond_block_end + cond_block_end_zero + tbb
 
 add = [ b'add', b'add.w', b'adds', b'adds.w', b'vadd.f32', b'addw' ]
 sub = [ b'sub', b'sub.w', b'subs', b'subs.w', b'vsub.f32' ]
@@ -88,11 +93,14 @@ bits = [ b'ubfx', b'bfc', b'bfi' ]
 
 sxtab = [ b'sxtab', b'sxtah' ]
 
+modifies_NCVZ = base_arith + mul + smull + div + vmlas + cast + bits + sxtab
+
+vdup = [ b'vdup.16' ]
+
+coprocessor = [ b'stc2l', b'ldc2l' ]
 
 moves = [ b'mov', b'movw', b'movs', b'movs.w',  b'vmov.f32', b'mov.w', b'vmov', b'vmrs'] 
 n_moves = [ b'mvn', b'mvn.w', b'mvns' ]
 move = moves + n_moves
 
-cond_branch = cond_block_end + cond_block_end_zero + tbb
 
-tst = [ b'tst', b'tst.w', b'tst.n' ]

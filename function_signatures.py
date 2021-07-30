@@ -278,7 +278,7 @@ def get_function_signature(block_graph):
                         scope[reg_kill] = False
                 else:
                     raise Exception
-            elif insn[0] in func_start + func_end + func_call + uncond_block_end + vpop + cond_block_end + tbb + nop + exchange_return + exchange_func_call: # ignore
+            elif insn[0] in func_start + func_end + func_call + uncond_block_end + vpop + cond_block_end + tbb + nop + exchange_return + exchange_func_call + vdup + coprocessor: # ignore
                 pass
             else:
                 print(i)
@@ -518,7 +518,7 @@ def get_function_signature(block_graph):
                         scope[reg_alive] = True
                 else:
                     raise Exception
-            elif insn[0] in func_start + func_end + func_call + uncond_block_end + vpop + cond_block_end + tbb + nop + exchange_return + exchange_func_call: # ignore
+            elif insn[0] in func_start + func_end + func_call + uncond_block_end + vpop + cond_block_end + tbb + nop + exchange_return + exchange_func_call + vdup + coprocessor: # ignore
                 pass
             else:
                 print(i)

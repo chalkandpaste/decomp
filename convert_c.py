@@ -25,7 +25,11 @@ def map_sections (sections):
                     # if instruction:
                     output = convert_instruction(instruction)
                     if output != b'':
-                        code.append(output + b';')
+                        try:
+                            code.append(output + b';')
+                        except:
+                            print(instruction)
+                            raise Exception
             section['code'] = code
         else:
             section['code'] = None
@@ -154,19 +158,33 @@ def bits(i):
         for j in range(lsb, width + lsb):
             val += 2**j
         return i[1] + b' = ' + i[2] + b' & ' + bytes(hex(val), 'utf-8')
-    elif i[0] == b'bfc':
+    elif i[0] == b'bfc' and len(i) == 4:
         lsb = int(i[2])
         width = int(i[3])
         val = 0
         for j in range(lsb, width + lsb):
             val += 2**j
         return i[1] + b' = ' + i[1] + b' & ~ ' + bytes(hex(val), 'utf-8')
+    elif i[0] == b'bfi' and len(i) == 5:
+        reg = i[2]
+        lsb = int(i[3])
+        width = int(i[4])
+        val = 0
+        for j in range(lsb, width + lsb):
+            val += 2**j
+        return i[1] + b' = ' + i[2] + b' | ' + bytes(hex(val), 'utf-8')
+    else:
+        print(i)
+        raise Exception
+
 
 def sxtab(i):
     return i[1] + b' = ' + i[2] + b' + (int) (char) ' + i[3]
 
 def shift_left(i):
-    if len(i) == 4:
+    if len(i) == 3:
+        return i[1] + b' = ' + i[1] + b' >> ' + i[2]
+    elif len(i) == 4:
         return i[1] + b' = ' + i[-2] + b' << ' + i[-1] 
     else:
         print(i)

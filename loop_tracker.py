@@ -18,6 +18,18 @@ class LoopTracker:
             if loc in self.loc_to_loop_start:
                 return loc == self.loc_to_loop_start[loc]
     
+    def get_loop_start(self, loc):
+        if loc in self.loc_to_loop_start:
+            return self.loc_to_loop_start[loc]
+        elif loc not in self.not_loop_loc:
+            return None
+        else:
+            return self.detect_loop(loc)
+            if loc in self.loc_to_loop_end:
+                return self.loc_to_loop_end[loc]
+            else:
+                return None
+    
     def is_loop_end(self, loc):
         # print('is_loop_end', hex(loc))
         if loc in self.loc_to_loop_end:
@@ -109,54 +121,63 @@ class LoopTracker:
             return True
         elif start_loc in self.not_loop_loc:
             return False
-
-        def can_loop(sl):
-            # print('can_loop', hex(sl))
-            ls = [sl]
-            sn = {}
-
-            while len(ls) > 0:
-                l = ls.pop(-1)
-                sn[l] = True
-
-                children_locs = [c for c in self.block_index[l]['children']]
-
-                for c in children_locs:
-                    # only need one counter-example
-                    if c == sl:
-                        return True
-                    elif c not in sn and c not in ls:
-                        ls.append(c)
-                    else:
-                        pass
-
-            return False
-
-        seen = {}
-        loop_locs = []
+        
         search_locs = []
-
-        # pre-emptive first check
-
-        if can_loop(start_loc):
+        if self._check_loop(start_loc):
             search_locs.append(start_loc)
         else: # if len(loop_locs) == 0:
             self.not_loop_loc[start_loc] = True
             return False
+       
+        loop_locs, entrance_loc, exit_loc = self._detect_loop_inner(search_locs)
+        if entrance_loc is not None and exit_loc is not None:
+            dont_follow = [entrance_loc, exit_loc]
+            while len(loop_locs) > 0:
+                loop_locs, entrance_loc, exit_loc = self._detect_loop_inner(loop_locs, dont_follow)
+                dont_follow += [entrance_loc, exit_loc]
+
+        return True
+    
+    def _check_loop(self, start_loc, dont_follow = []):
+        print('_check_loop', hex(start_loc), [hex(df) for df in dont_follow])
+        seen = {}
+        search_locs = [start_loc]
+
+        while len(search_locs) > 0:
+            loc = search_locs.pop(-1)
+            seen[loc] = True
+
+            c_locs = [c for c in self.block_index[loc]['children']]
+
+            for c in c_locs:
+                # only need one counter-example
+                if c == start_loc:
+                    return True
+                elif c not in seen and c not in search_locs and c not in dont_follow:
+                    search_locs.append(c)
+                else:
+                    pass
+
+        return False
+
+    def _detect_loop_inner(self, search_locs, dont_follow = []):
+        print('_detect_loop_inner', [hex(l) for l in search_locs], [hex(df) for df in dont_follow])
+        seen = {}
+        loop_locs = []
 
         while len(search_locs) > 0:
             loc = search_locs.pop(0)
             seen[loc] = True
 
             if loc not in self.not_loop_loc:
-                if can_loop(loc):
-                    loop_locs.append(loc)
+                if self._check_loop(loc, dont_follow):
+                    if loc not in dont_follow:
+                        loop_locs.append(loc)
                     for c in self.block_index[loc]['children']:
-                        if c not in seen:
+                        if c not in seen and c not in dont_follow and c not in search_locs:
                             search_locs.append(c)
                 else:
                     self.not_loop_loc[loc] = True
-
 
             children_locs = [c for c in self.block_index[loc]['children']]
             # print('children_locs', [hex(c) for c in children_locs])
@@ -211,7 +232,7 @@ class LoopTracker:
         # print("exit_loc", hex(exit_loc) if exit_loc is not None else None)
         # print("loop_locs", [hex(l) for l in loop_locs])
 
-        if entrance_loc is None or exit_loc is None:
+        if (entrance_loc is not None and exit_loc is None) or (entrance_loc is None and exit_loc is not None):
             print("entrance_loc", hex(entrance_loc) if entrance_loc is not None else None)
             print("exit_loc", hex(exit_loc) if exit_loc is not None else None)
             print("loop_locs", [hex(l) for l in loop_locs])
@@ -222,4 +243,4 @@ class LoopTracker:
             self.loc_to_loop_end[loc] = exit_loc
             self.loc_to_loop_locs[loc] = loop_locs
 
-        return True
+        return loop_locs, entrance_loc, exit_loc

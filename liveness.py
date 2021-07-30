@@ -119,19 +119,19 @@ def liveness_expr(e, liveness):
 def liveness_if (i, liveness):
 
     if i.iffalse and i.iffalse.block_items:
-        i.iffalse.block_items, false_liveness = liveness_body(i.iffalse.block_items, liveness)
+        i.iffalse.block_items, false_liveness = liveness_body(i.iffalse.block_items, liveness.copy())
     else:
         false_liveness = liveness
 
 
     if i.iftrue and i.iftrue.block_items:
-        i.iftrue.block_items, true_liveness = liveness_body(i.iftrue.block_items, liveness)
+        i.iftrue.block_items, true_liveness = liveness_body(i.iftrue.block_items, liveness.copy())
     else:
         true_liveness = liveness
    
     for k in false_liveness:
-        if false_liveness[k]:
-            true_liveness[k] = True
+        if false_liveness[k] or true_liveness[k]:
+            liveness[k] = True
 
     liveness = liveness_expr(i.cond, liveness)
     
@@ -139,13 +139,13 @@ def liveness_if (i, liveness):
 
 def liveness_while (w, liveness):
 
-    w.stmt.block_items, liveness = liveness_body(w.stmt.block_items, liveness)
+    w.stmt.block_items, liveness = liveness_body(w.stmt.block_items, liveness.copy())
 
     return w, liveness
 
 def liveness_switch (s, liveness):
 
-    s.stmt.block_items, liveness = liveness_body(s.stmt.block_items, liveness)
+    s.stmt.block_items, liveness = liveness_body(s.stmt.block_items, liveness.copy())
 
     liveness = liveness_expr(s.cond, liveness)
 
@@ -154,12 +154,15 @@ def liveness_switch (s, liveness):
 def liveness_func (f, liveness):
     if f.args:
         for e in f.args.exprs:
-            liveness = liveness_expr(e, liveness)
+            liveness = liveness_expr(e, liveness.copy())
 
     return liveness
 
 def liveness_body (body, liveness):
-    
+   
+    if body is None:
+        return body, liveness
+
     new_block_items = []
 
     body.reverse()

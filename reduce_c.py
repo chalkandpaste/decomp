@@ -127,7 +127,7 @@ def add_to_scope(scope, assign):
             print(assign)
             print(scope)
             raise Exception
-        if expr_depth(val, 6):
+        if expr_depth(val, 10):
             substitution = c_ast.Assignment(op = "=", lvalue = c_ast.ID('var' + str(var_counter)), rvalue = scope[name]);
             scope[name] = c_ast.ID('var' + str(var_counter))
             var_counter += 1
@@ -159,7 +159,7 @@ def expr_depth(ex, limit = 3):
             elif isinstance(e, c_ast.Constant):
                 return d
             elif isinstance(e, c_ast.FuncCall):
-                return l/2 + 1
+                return 3*l//4
             elif isinstance(e, c_ast.Cast):
                 return e_dep(e.expr, d + 1, l)
             else:
@@ -272,19 +272,25 @@ def merge_while_scope(scope, w_scope):
     return scope
 
 def reduce_while (w, scope):
+    # print('reduce_while')
 
     global while_killer
 
-    # reduce first within the while using unassigned scope
-    w.stmt.block_items, w_scope = reduce_body(w.stmt.block_items, init_scope.copy())
-    
-    # take out any variables that were used from the current scope
-    scope = merge_while_scope(scope.copy(), w_scope) 
+    # print('scope', scope)
 
-    if while_killer:
-        # reduce further with any scope
-        w.stmt.block_items, _= reduce_body(w.stmt.block_items, scope.copy())
+    # reduce first within the while using unassigned scope
+    w_block_items, w_scope = reduce_body(w.stmt.block_items, init_scope.copy())
     
+    # print('w_scope', w_scope)
+
+    # take out any variables that were used from the current scope
+    scope = merge_while_scope(scope.copy(), w_scope.copy()) 
+
+    # print('scope', scope)
+
+    # # reduce further with any scope
+    # w.stmt.block_items, _= reduce_body(w.stmt.block_items, scope.copy())
+   
     return w, scope
 
 def reduce_switch (s, scope):
@@ -333,7 +339,10 @@ def reduce_func (f, scope):
     return f
 
 def reduce_body (body, scope):
-    
+
+    if body is None:
+        return body, scope
+
     new_block_items = []
     kill_list = []
     clean_new_block_items = []
