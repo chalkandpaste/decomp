@@ -2,7 +2,7 @@ import pickle
 import re
 import argparse
 
-import instructions as ns
+from . import instructions as ns
 
 def map_sections (sections):
     new_sections = []
@@ -366,4 +366,3 @@ if __name__ == "__main__":
     out_file = open(args.output_file, 'wb')
 
     out_file.write(output)
-

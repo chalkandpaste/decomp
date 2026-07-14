@@ -6,21 +6,21 @@ suggestions should live in `state.sqlite`, not in generated C files.
 
 ## Backend First
 
-`decomp_project.py` is the first small backend for this. It supports:
+`decomp-project` is the first small backend for this. It supports:
 
 ```bash
-python3 decomp_project.py init .decomp/state.sqlite \
+decomp-project init .decomp/state.sqlite \
   --binary /Volumes/Locker/Synth/DD2.1.0.bin \
   --architecture arm-thumb \
   --base-address 0x08020000 \
   --entry-point 0x080202cc
 
-python3 decomp_project.py rename .decomp/state.sqlite 0x08034f48 system_clock_init
-python3 decomp_project.py note .decomp/state.sqlite 0x08034f48 "writes CPACR and RCC registers"
-python3 decomp_project.py suggest .decomp/state.sqlite 0x08034f48 function_name clock_tree_init \
+decomp-project rename .decomp/state.sqlite 0x08034f48 system_clock_init
+decomp-project note .decomp/state.sqlite 0x08034f48 "writes CPACR and RCC registers"
+decomp-project suggest .decomp/state.sqlite 0x08034f48 function_name clock_tree_init \
   --rationale "touches RCC registers and PLL constants" \
   --confidence 0.7
-python3 decomp_project.py list .decomp/state.sqlite
+decomp-project list .decomp/state.sqlite
 ```
 
 The Vim plugin can start by shelling out to this CLI. Later, replace that with

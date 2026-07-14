@@ -1,5 +1,5 @@
-from instruction_buffer import InstructionsBuffer
-from instructions import *
+from .instruction_buffer import InstructionsBuffer
+from .instructions import *
 
 import pickle
 import os.path

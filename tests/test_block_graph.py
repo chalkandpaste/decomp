@@ -2,7 +2,7 @@ import contextlib
 import io
 import unittest
 
-from block_graph import generate_block_graph
+from decomp.block_graph import generate_block_graph
 
 
 class BlockGraphTests(unittest.TestCase):

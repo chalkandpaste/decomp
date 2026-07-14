@@ -1,7 +1,7 @@
-from block_graph import generate_block_graph, recurse_graph
+from .block_graph import generate_block_graph, recurse_graph
 
-from loop_tracker import LoopTracker
-from instructions import *
+from .loop_tracker import LoopTracker
+from .instructions import *
     
 skip_functions = [ 134469972, 134471256, 134469472, 134471424, 134472782, 134455624, 134470750, 134472518,
             0x8020298, 0x80205d6, 0x802fe84, 0x8020ccc, 0x8020334, 0x8020f24, 0x8020c40, 0x8021470, 0x8021340,

@@ -3,7 +3,10 @@ from pathlib import Path
 
 def main():
 
-    parser = argparse.ArgumentParser('decompile from entry point location')
+    parser = argparse.ArgumentParser(
+        prog='decomp',
+        description='decompile firmware from an entry point',
+    )
 
     parser.add_argument('input_file', metavar='i', type=str, help="input file")
     parser.add_argument('entry_point_loc', metavar='e', type=str, help="entry point location")
@@ -21,12 +24,12 @@ def main():
     
     args = parser.parse_args()
 
-    from block_graph import generate_block_graph, generate_asm
-    from convert_c import convert
-    from disassemble import generate_func_cf_asm
-    from function_signatures import collect_functions, skip_functions
-    from liveness import liveness
-    from reduce_c import reduce_c
+    from .block_graph import generate_block_graph, generate_asm
+    from .convert_c import convert
+    from .disassemble import generate_func_cf_asm
+    from .function_signatures import collect_functions, skip_functions
+    from .liveness import liveness
+    from .reduce_c import reduce_c
     
     output_dir = Path(args.output_dir)
     cf_dir = output_dir / 'cf'

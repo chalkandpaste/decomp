@@ -1,8 +1,8 @@
 # Architecture Extensibility
 
 The current implementation is ARM Thumb-specific, but synth firmware work will
-benefit from a pluggable architecture layer. `architectures.py` records the
-first target list and the feasibility notes.
+benefit from a pluggable architecture layer. `src/decomp/architectures.py`
+records the first target list and the feasibility notes.
 
 ## Current Target
 

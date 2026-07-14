@@ -2,7 +2,7 @@ import subprocess
 import struct
 import re
 
-from instructions import *
+from .instructions import *
 
 def disassemble_section(section_bytes):
     cmd = [

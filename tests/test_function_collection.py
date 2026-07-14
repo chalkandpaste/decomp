@@ -1,6 +1,6 @@
 import unittest
 
-from function_signatures import collect_functions
+from decomp.function_signatures import collect_functions
 
 
 class CollectFunctionsTests(unittest.TestCase):

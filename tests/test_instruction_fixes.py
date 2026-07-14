@@ -1,9 +1,9 @@
 import struct
 import unittest
 
-import convert_c
-import instructions
-from instruction_buffer import InstructionsBuffer, is_probable_address_literal
+from decomp import convert_c
+from decomp import instructions
+from decomp.instruction_buffer import InstructionsBuffer, is_probable_address_literal
 
 
 class InstructionBufferLiteralTests(unittest.TestCase):

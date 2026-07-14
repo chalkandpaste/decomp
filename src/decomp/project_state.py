@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from architectures import get_architecture
+from .architectures import get_architecture
 
 
 SCHEMA_VERSION = 1

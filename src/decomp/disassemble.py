@@ -1,9 +1,9 @@
 import argparse
 
-from loop_tracker import LoopTracker
-from instructions import *
-from function_signatures import generate_func_sigs, add_function_sigs, get_function_signature
-from block_graph import generate_block_graph, print_block_graph
+from .loop_tracker import LoopTracker
+from .instructions import *
+from .function_signatures import generate_func_sigs, add_function_sigs, get_function_signature
+from .block_graph import generate_block_graph, print_block_graph
 
 
 # type if_meta_block -- block to contain if (triangle control flow)

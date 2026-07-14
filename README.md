@@ -1,133 +1,147 @@
 # decomp
 
-`decomp` is a personal ARM Thumb decompilation toolchain. I used it on
-Cortex-M firmware to recover enough C-like structure to understand behavior,
-patch bugs, and rebuild altered binaries.
+`decomp` is a firmware decompilation and reverse-engineering package. It grew
+out of a practical ARM Thumb toolchain used on Cortex-M firmware to recover
+C-like structure, understand behavior, patch bugs, and rebuild altered
+binaries.
 
-It is not a general-purpose production decompiler. The code is intentionally
-biased toward the firmware I was working on, especially STM32F405-era Cortex-M4
-Thumb code and the calling/branching patterns emitted by GCC. Within those
-constraints, the tool is useful: it discovers functions from an entry point,
-builds control-flow graphs, structures basic blocks, lowers instructions into
-C-like statements, and applies simple expression/liveness cleanup.
+The current working backend is ARM Thumb/Cortex-M. The package is being shaped
+so other older synth-firmware targets can be added without baking ARM-specific
+assumptions into every layer.
 
-## Pipeline
+## What It Does
 
-The main driver is `decompile.py`. Given a binary and a fixed entry point, it:
+- Disassembles firmware bytes through `rasm2`.
+- Builds basic blocks and control-flow graphs from a fixed entry point.
+- Discovers referenced functions and follows the call graph.
+- Infers rough register-based function signatures.
+- Structures blocks into C-like `if`, `while`, and jump-table forms.
+- Lowers supported instructions into C-like statements.
+- Reduces expressions and removes dead register assignments.
+- Stores investigation state such as names, notes, and AI suggestions.
 
-1. Disassembles Thumb instructions with `rasm2`.
-2. Builds basic blocks and control-flow edges.
-3. Finds referenced functions and repeats the walk.
-4. Infers rough function signatures from register use.
-5. Structures blocks into `if`, `while`, and jump-table forms.
-6. Converts instruction comments into C-like statements.
-7. Reduces expressions and removes dead register assignments.
+This is not a general-purpose production decompiler yet. It is a useful
+firmware-analysis tool with an honest roadmap toward more robust packaging,
+state management, editor integration, and architecture support.
 
-The important modules are:
+## Install
 
-- `instruction_buffer.py`: buffered `rasm2` disassembly plus literal-pool reads.
-- `block_graph.py`: basic-block discovery and graph traversal.
-- `function_signatures.py`: call discovery and ABI-ish signature inference.
-- `disassemble.py`: control-flow structuring into meta-blocks.
-- `convert_c.py`: instruction-to-C lowering.
-- `reduce_c.py` and `liveness.py`: C AST cleanup passes using `pycparser`.
-
-## Requirements
-
-- Python 3.10+
-- `pycparser`
-- `rasm2` from radare2 on `PATH`
-
-Install Python dependencies with:
+Python 3.10+ is required. `rasm2` from radare2 must be available on `PATH`.
 
 ```bash
 python3 -m pip install -e .
 ```
 
-Install radare2 separately for your platform.
-
-## Usage
+On macOS, radare2 can be installed with:
 
 ```bash
-python3 decompile.py firmware.bin 0x08020004
+brew install radare2
 ```
 
-The full pipeline writes disassembly, control-flow C, and reduced C into
-`asm/`, `cf/`, and `c/` under the selected output directory. Those directories
-are created automatically.
+## Command Line
+
+Run the ARM Thumb pipeline:
 
 ```bash
-python3 decompile.py firmware.bin 0x08020004 --output-dir build/demo
+decomp firmware.bin 0x080202cc --output-dir build/demo --max-functions 10
 ```
 
-After an editable install, the same driver is available as:
+The pipeline writes:
+
+- `asm/`: recovered assembly views
+- `cf/`: structured control-flow C
+- `c/`: lowered/reduced C-like output
+
+`decomp-thumb` is kept as an alias for the same command.
+
+Manage investigation state:
 
 ```bash
-decomp-thumb firmware.bin 0x08020004 --output-dir build/demo
-```
-
-For smoke tests on real firmware, cap recursive discovery:
-
-```bash
-python3 decompile.py firmware.bin 0x080202cc --output-dir build/smoke --max-functions 10
-```
-
-For smaller stages:
-
-```bash
-python3 block_graph.py input.s output.s 0x08020004
-python3 disassemble.py firmware.bin output.c 0x08020004
-python3 convert_c.py control_flow.c lowered.c
-```
-
-## Current Limitations
-
-- The disassembler integration is tied to `rasm2 -a arm.gnu -b 16 -c m4`.
-- Function skipping and some address assumptions are currently hard-coded.
-- Error handling still reflects exploratory use: many unsupported cases raise
-  generic exceptions with nearby instruction dumps.
-- The control-flow structurer assumes compiler-shaped code and can fail on
-  irreducible or hand-written assembly.
-- Generated outputs and scratch artifacts have historically lived beside the
-  source; new transient outputs are ignored while the old examples are kept for
-  reference.
-
-## Cleanup Roadmap
-
-1. Keep behavior stable while adding tests around known instruction-lowering
-   and literal-handling edge cases.
-2. Replace hard-coded output paths with CLI options and automatic directory
-   creation.
-3. Move source into a package, keeping the old script entry points as wrappers.
-4. Replace dict-shaped graph records with typed objects once tests cover the
-   pipeline.
-5. Turn noisy debug prints and broad exceptions into logging plus contextual
-   errors.
-6. Add small shareable fixtures so the repo demonstrates the tool without
-   depending on private firmware.
-
-## Investigation Workflow
-
-The direction for editor integration is to treat generated C and assembly as
-views over project state. Function names, signatures, notes, and AI suggestions
-should be stored durably so a firmware investigation can be resumed later.
-
-Start a state database with:
-
-```bash
-python3 decomp_project.py init .decomp/state.sqlite \
+decomp-project init .decomp/state.sqlite \
   --binary firmware.bin \
   --architecture arm-thumb \
   --base-address 0x08020000 \
   --entry-point 0x080202cc
+
+decomp-project rename .decomp/state.sqlite 0x08034f48 system_clock_init
+decomp-project note .decomp/state.sqlite 0x08034f48 "writes CPACR and RCC registers"
+decomp-project suggest .decomp/state.sqlite 0x08034f48 function_name clock_tree_init \
+  --rationale "touches RCC and PLL constants" \
+  --confidence 0.7
+decomp-project export-names .decomp/state.sqlite build/names.json
 ```
 
-Then record naming work:
+List known architecture targets:
 
 ```bash
-python3 decomp_project.py rename .decomp/state.sqlite 0x08034f48 system_clock_init
-python3 decomp_project.py note .decomp/state.sqlite 0x08034f48 "writes CPACR and RCC registers"
+decomp-project architectures
 ```
 
-See `docs/VIM_WORKFLOW.md` for the proposed Vim command surface and
-`docs/ARCHITECTURES.md` for the architecture-extensibility plan.
+## Package Layout
+
+```text
+src/decomp/
+  cli.py                 main decompiler CLI
+  project_cli.py         project-state CLI
+  architectures.py       supported/prospective architecture registry
+  project_state.py       SQLite project state
+  instruction_buffer.py  rasm2 integration and literal reads
+  block_graph.py         basic-block discovery and graph traversal
+  function_signatures.py function discovery and signature heuristics
+  disassemble.py         control-flow structuring
+  convert_c.py           instruction-to-C lowering
+  reduce_c.py            C AST expression reduction
+  liveness.py            dead register-assignment cleanup
+```
+
+Legacy interactive mapping helpers live in `src/decomp/legacy/`.
+
+Historical generated outputs from the original workflow are preserved under
+`examples/legacy/`. New generated files should go under `build/` or another
+ignored work directory.
+
+## Editor Workflow
+
+Generated C and assembly should be treated as disposable views over durable
+project state. Names, notes, signatures, and AI suggestions belong in the
+project database so a firmware investigation can be resumed later.
+
+See [docs/VIM_WORKFLOW.md](docs/VIM_WORKFLOW.md) for the proposed Vim command
+surface and state model.
+
+## Architecture Extensibility
+
+The current backend is `arm-thumb`. Prospective synth-firmware targets are
+tracked in [docs/ARCHITECTURES.md](docs/ARCHITECTURES.md):
+
+- Hitachi 63B03 / Motorola 6800-family
+- Motorola 68B09E / 6809-family
+- Renesas SH7727 / SH-3-DSP
+- XMOS XS1-family xCORE
+
+Each architecture will need its own instruction parser, branch/call/return
+classifier, calling-convention model, data-flow rules, and startup/vector
+discovery.
+
+## Development
+
+Run tests from the repository root with `src` on `PYTHONPATH`:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
+
+Compile-check the package:
+
+```bash
+PYTHONPATH=src python3 -m py_compile src/decomp/*.py src/decomp/legacy/*.py tests/*.py
+```
+
+## Current Limitations
+
+- ARM Thumb is the only implemented architecture backend.
+- Several passes still use dict-shaped records instead of typed models.
+- Debug output is still noisy in deeper pipeline runs.
+- Function-boundary recovery is heuristic and firmware/toolchain-sensitive.
+- AI suggestions are stored, but model-backed suggestion generation is not wired
+  into the CLI yet.

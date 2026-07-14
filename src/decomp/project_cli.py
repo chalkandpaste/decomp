@@ -1,7 +1,7 @@
 import argparse
 
-from architectures import list_architectures
-from project_state import (
+from .architectures import list_architectures
+from .project_state import (
     add_ai_suggestion,
     add_note,
     connect,
@@ -76,7 +76,10 @@ def cmd_export_names(args):
 
 
 def build_parser():
-    parser = argparse.ArgumentParser("decomp project state")
+    parser = argparse.ArgumentParser(
+        prog="decomp-project",
+        description="manage decompiler project state",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("init", help="initialize a decompiler project state database")

@@ -3,35 +3,29 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "decomp-thumb"
+name = "decomp-firmware"
 version = "0.1.0"
-description = "Personal ARM Thumb decompilation toolchain for Cortex-M firmware."
+description = "Firmware decompilation and reverse-engineering utilities for older embedded targets."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "pycparser>=2.21",
 ]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Disassemblers",
+]
 
 [project.scripts]
-decomp-thumb = "decompile:main"
-decomp-project = "decomp_project:main"
+decomp = "decomp.cli:main"
+decomp-thumb = "decomp.cli:main"
+decomp-project = "decomp.project_cli:main"
 
-[tool.setuptools]
-py-modules = [
-    "block_graph",
-    "build_map",
-    "convert_c",
-    "architectures",
-    "decomp_project",
-    "decompile",
-    "disassemble",
-    "function_signatures",
-    "generate_asm",
-    "instruction_buffer",
-    "instructions",
-    "liveness",
-    "loop_tracker",
-    "make_map",
-    "project_state",
-    "reduce_c",
-]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+decomp = ["py.typed"]

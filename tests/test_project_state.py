@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from project_state import (
+from decomp.project_state import (
     add_ai_suggestion,
     add_note,
     connect,

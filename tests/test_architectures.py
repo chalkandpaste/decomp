@@ -1,6 +1,6 @@
 import unittest
 
-from architectures import get_architecture, list_architectures
+from decomp.architectures import get_architecture, list_architectures
 
 
 class ArchitectureRegistryTests(unittest.TestCase):

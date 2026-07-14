@@ -1,5 +1,5 @@
-from block_graph import generate_asm
-from function_signatures import generate_set_of_funcs
+from .block_graph import generate_asm
+from .function_signatures import generate_set_of_funcs
 
 import argparse
 
