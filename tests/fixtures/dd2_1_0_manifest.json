@@ -1,0 +1,9 @@
+{
+  "binary_name": "DD2.1.0.bin",
+  "binary_path_hint": "/Volumes/Locker/Synth/DD2.1.0.bin",
+  "architecture": "arm-thumb",
+  "base_address": "0x08020000",
+  "entry_point": "0x080202cc",
+  "binary_size": 218492,
+  "binary_sha256": "d0bbcbf5ffb0f47754bcc3c97bce305e33453ab4693db21fd7ec915d9c8036f0"
+}

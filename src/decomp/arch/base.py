@@ -1,0 +1,31 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Protocol
+
+from decomp.core.flow import FlowInfo
+from decomp.core.image import FirmwareImage
+from decomp.core.instruction import Instruction
+
+
+@dataclass(frozen=True)
+class DisassemblerConfig:
+    tool: str
+    architecture: str
+    bits: int
+    extra_args: tuple[str, ...] = ()
+
+
+class ArchitectureBackend(Protocol):
+    id: str
+    display_name: str
+    disassembler: DisassemblerConfig
+
+    def decode_legacy_tokens(self, tokens: list[object]) -> Instruction:
+        """Convert current legacy token lists into typed instructions."""
+
+    def classify_flow(self, instruction: Instruction) -> FlowInfo:
+        """Return architecture-specific control-flow information."""
+
+    def is_probable_code_address(self, image: FirmwareImage, value: int) -> bool:
+        """Return whether a literal can plausibly reference code for this target."""

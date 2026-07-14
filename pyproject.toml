@@ -23,6 +23,7 @@ classifiers = [
 decomp = "decomp.cli:main"
 decomp-thumb = "decomp.cli:main"
 decomp-project = "decomp.project_cli:main"
+decomp-parity = "decomp.parity:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

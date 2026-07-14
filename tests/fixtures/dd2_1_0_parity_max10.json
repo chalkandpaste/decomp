@@ -1,0 +1,373 @@
+{
+  "architecture": "arm-thumb",
+  "base_address": "0x8020000",
+  "binary_sha256": "d0bbcbf5ffb0f47754bcc3c97bce305e33453ab4693db21fd7ec915d9c8036f0",
+  "binary_size": 218492,
+  "discovery_order": [
+    "0x80202cc",
+    "0x8020188",
+    "0x8034f48",
+    "0x803228c"
+  ],
+  "entry_point": "0x80202cc",
+  "functions": [
+    {
+      "address": "0x80202cc",
+      "block_count": 2,
+      "blocks": [
+        {
+          "address": "0x80202cc",
+          "end": "0x80202d4",
+          "incoming": [],
+          "instruction_count": 4,
+          "outgoing": [
+            "0x80202d4"
+          ]
+        },
+        {
+          "address": "0x80202d4",
+          "end": "0x80202d6",
+          "incoming": [
+            "0x80202cc",
+            "0x80202d4"
+          ],
+          "instruction_count": 1,
+          "outgoing": [
+            "0x80202d4"
+          ]
+        }
+      ],
+      "calls": [
+        "0x8020188",
+        "0x8034f48"
+      ],
+      "error": null,
+      "instruction_count": 5,
+      "status": "ok"
+    },
+    {
+      "address": "0x8020188",
+      "block_count": 0,
+      "blocks": [],
+      "calls": [],
+      "error": "ValueError: invalid literal for int() with base 0: '0x00000034)'",
+      "instruction_count": 0,
+      "status": "failed"
+    },
+    {
+      "address": "0x8034f48",
+      "block_count": 13,
+      "blocks": [
+        {
+          "address": "0x803228c",
+          "end": "0x803229e",
+          "incoming": [
+            "0x8034f48"
+          ],
+          "instruction_count": 8,
+          "outgoing": [
+            "0x803229e"
+          ]
+        },
+        {
+          "address": "0x803229e",
+          "end": "0x80322b0",
+          "incoming": [
+            "0x803228c",
+            "0x80322b0"
+          ],
+          "instruction_count": 8,
+          "outgoing": [
+            "0x80322b8",
+            "0x80322b0"
+          ]
+        },
+        {
+          "address": "0x80322b0",
+          "end": "0x80322b8",
+          "incoming": [
+            "0x803229e"
+          ],
+          "instruction_count": 3,
+          "outgoing": [
+            "0x803229e",
+            "0x80322b8"
+          ]
+        },
+        {
+          "address": "0x80322b8",
+          "end": "0x80322c0",
+          "incoming": [
+            "0x80322b0",
+            "0x803229e"
+          ],
+          "instruction_count": 3,
+          "outgoing": [
+            "0x80322c6",
+            "0x80322c0"
+          ]
+        },
+        {
+          "address": "0x80322c0",
+          "end": "0x80322c6",
+          "incoming": [
+            "0x80322b8"
+          ],
+          "instruction_count": 3,
+          "outgoing": [
+            "0x80322c8"
+          ]
+        },
+        {
+          "address": "0x80322c6",
+          "end": "0x80322c8",
+          "incoming": [
+            "0x80322b8"
+          ],
+          "instruction_count": 1,
+          "outgoing": [
+            "0x80322c8"
+          ]
+        },
+        {
+          "address": "0x80322c8",
+          "end": "0x80322ce",
+          "incoming": [
+            "0x80322c0",
+            "0x80322c6"
+          ],
+          "instruction_count": 3,
+          "outgoing": [
+            "0x8032330",
+            "0x80322ce"
+          ]
+        },
+        {
+          "address": "0x80322ce",
+          "end": "0x8032306",
+          "incoming": [
+            "0x80322c8"
+          ],
+          "instruction_count": 23,
+          "outgoing": [
+            "0x8032306"
+          ]
+        },
+        {
+          "address": "0x8032306",
+          "end": "0x803230e",
+          "incoming": [
+            "0x80322ce",
+            "0x8032306"
+          ],
+          "instruction_count": 3,
+          "outgoing": [
+            "0x8032306",
+            "0x803230e"
+          ]
+        },
+        {
+          "address": "0x803230e",
+          "end": "0x8032326",
+          "incoming": [
+            "0x8032306"
+          ],
+          "instruction_count": 9,
+          "outgoing": [
+            "0x8032326"
+          ]
+        },
+        {
+          "address": "0x8032326",
+          "end": "0x8032330",
+          "incoming": [
+            "0x803230e",
+            "0x8032326"
+          ],
+          "instruction_count": 4,
+          "outgoing": [
+            "0x8032326",
+            "0x8032330"
+          ]
+        },
+        {
+          "address": "0x8032330",
+          "end": "0x8032334",
+          "incoming": [
+            "0x80322c8",
+            "0x8032326"
+          ],
+          "instruction_count": 2,
+          "outgoing": []
+        },
+        {
+          "address": "0x8034f48",
+          "end": "0x8034f84",
+          "incoming": [],
+          "instruction_count": 24,
+          "outgoing": [
+            "0x803228c"
+          ]
+        }
+      ],
+      "calls": [
+        "0x803228c"
+      ],
+      "error": null,
+      "instruction_count": 94,
+      "status": "ok"
+    },
+    {
+      "address": "0x803228c",
+      "block_count": 12,
+      "blocks": [
+        {
+          "address": "0x803228c",
+          "end": "0x803229e",
+          "incoming": [],
+          "instruction_count": 8,
+          "outgoing": [
+            "0x803229e"
+          ]
+        },
+        {
+          "address": "0x803229e",
+          "end": "0x80322b0",
+          "incoming": [
+            "0x803228c",
+            "0x80322b0"
+          ],
+          "instruction_count": 8,
+          "outgoing": [
+            "0x80322b8",
+            "0x80322b0"
+          ]
+        },
+        {
+          "address": "0x80322b0",
+          "end": "0x80322b8",
+          "incoming": [
+            "0x803229e"
+          ],
+          "instruction_count": 3,
+          "outgoing": [
+            "0x803229e",
+            "0x80322b8"
+          ]
+        },
+        {
+          "address": "0x80322b8",
+          "end": "0x80322c0",
+          "incoming": [
+            "0x80322b0",
+            "0x803229e"
+          ],
+          "instruction_count": 3,
+          "outgoing": [
+            "0x80322c6",
+            "0x80322c0"
+          ]
+        },
+        {
+          "address": "0x80322c0",
+          "end": "0x80322c6",
+          "incoming": [
+            "0x80322b8"
+          ],
+          "instruction_count": 3,
+          "outgoing": [
+            "0x80322c8"
+          ]
+        },
+        {
+          "address": "0x80322c6",
+          "end": "0x80322c8",
+          "incoming": [
+            "0x80322b8"
+          ],
+          "instruction_count": 1,
+          "outgoing": [
+            "0x80322c8"
+          ]
+        },
+        {
+          "address": "0x80322c8",
+          "end": "0x80322ce",
+          "incoming": [
+            "0x80322c0",
+            "0x80322c6"
+          ],
+          "instruction_count": 3,
+          "outgoing": [
+            "0x8032330",
+            "0x80322ce"
+          ]
+        },
+        {
+          "address": "0x80322ce",
+          "end": "0x8032306",
+          "incoming": [
+            "0x80322c8"
+          ],
+          "instruction_count": 23,
+          "outgoing": [
+            "0x8032306"
+          ]
+        },
+        {
+          "address": "0x8032306",
+          "end": "0x803230e",
+          "incoming": [
+            "0x80322ce",
+            "0x8032306"
+          ],
+          "instruction_count": 3,
+          "outgoing": [
+            "0x8032306",
+            "0x803230e"
+          ]
+        },
+        {
+          "address": "0x803230e",
+          "end": "0x8032326",
+          "incoming": [
+            "0x8032306"
+          ],
+          "instruction_count": 9,
+          "outgoing": [
+            "0x8032326"
+          ]
+        },
+        {
+          "address": "0x8032326",
+          "end": "0x8032330",
+          "incoming": [
+            "0x803230e",
+            "0x8032326"
+          ],
+          "instruction_count": 4,
+          "outgoing": [
+            "0x8032326",
+            "0x8032330"
+          ]
+        },
+        {
+          "address": "0x8032330",
+          "end": "0x8032334",
+          "incoming": [
+            "0x80322c8",
+            "0x8032326"
+          ],
+          "instruction_count": 2,
+          "outgoing": []
+        }
+      ],
+      "calls": [],
+      "error": null,
+      "instruction_count": 70,
+      "status": "ok"
+    }
+  ],
+  "max_functions": 10,
+  "schema_version": 1
+}

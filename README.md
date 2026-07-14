@@ -77,11 +77,25 @@ List known architecture targets:
 decomp-project architectures
 ```
 
+Capture/check legacy parity before refactoring internals:
+
+```bash
+decomp-parity capture firmware.bin build/parity.json \
+  --entry-point 0x080202cc \
+  --max-functions 10
+
+decomp-parity check firmware.bin build/parity.json
+```
+
 ## Package Layout
 
 ```text
 src/decomp/
+  core/                 typed firmware/program/CFG/instruction model
+  arch/                 architecture backend interfaces and ARM Thumb scaffold
   cli.py                 main decompiler CLI
+  parity.py             legacy parity snapshot capture/check CLI
+  legacy_adapter.py     bridge from old dict/list graphs to typed CFGs
   project_cli.py         project-state CLI
   architectures.py       supported/prospective architecture registry
   project_state.py       SQLite project state
@@ -108,6 +122,9 @@ project database so a firmware investigation can be resumed later.
 
 See [docs/VIM_WORKFLOW.md](docs/VIM_WORKFLOW.md) for the proposed Vim command
 surface and state model.
+
+See [docs/REDESIGN.md](docs/REDESIGN.md) for the typed model, architecture
+boundary, and DD2 parity workflow that will guide the real internal refactor.
 
 ## Architecture Extensibility
 

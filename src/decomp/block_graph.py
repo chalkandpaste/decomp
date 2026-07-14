@@ -118,7 +118,8 @@ def check_bg_cache(entry_point_loc):
     fp = 'bgc/v' + str(CACHE_VERSION) + '-' + hex(entry_point_loc)
     
     if os.path.isfile(fp):
-        return pickle.load(open(fp, 'rb'))
+        with open(fp, 'rb') as handle:
+            return pickle.load(handle)
     else:
         return None
 
@@ -127,16 +128,18 @@ def cache_bg(entry_point_loc, block_graph):
     # print('caching')
     os.makedirs('bgc', exist_ok=True)
     fp = 'bgc/v' + str(CACHE_VERSION) + '-' + hex(entry_point_loc)
-    pickle.dump(block_graph, open(fp, 'wb'))
+    with open(fp, 'wb') as handle:
+        pickle.dump(block_graph, handle)
 
 def generate_block_graph(binary, entry_point_loc, use_cache=True, override_input=None):
     print('generate_block_graph', hex(entry_point_loc))
 
     ## CACHING
     
-    cached_bg = check_bg_cache(entry_point_loc)
-    if cached_bg is not None and use_cache:
-        return cached_bg
+    if use_cache:
+        cached_bg = check_bg_cache(entry_point_loc)
+        if cached_bg is not None:
+            return cached_bg
 
     ## END CACHING
     
