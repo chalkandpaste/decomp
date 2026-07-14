@@ -1,5 +1,7 @@
 from pycparser import parse_file, c_generator, c_ast, c_parser
 import argparse
+import os
+import tempfile
 
 parser = c_parser.CParser()
 
@@ -240,12 +242,14 @@ def liveness_body (body, liveness):
     return new_block_items, liveness 
 
 def liveness(raw):
-    
-    f = open('scratch/temp.c', 'wb')
-    f.write(raw)
-    f.close()
-    
-    ast = parse_file('scratch/temp.c', use_cpp=True)
+    with tempfile.NamedTemporaryFile(suffix='.c', delete=False) as f:
+        f.write(raw)
+        temp_path = f.name
+
+    try:
+        ast = parse_file(temp_path, use_cpp=True)
+    finally:
+        os.unlink(temp_path)
    
     body = ast.ext[0].body
 

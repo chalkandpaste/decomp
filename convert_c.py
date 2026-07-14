@@ -183,7 +183,7 @@ def sxtab(i):
 
 def shift_left(i):
     if len(i) == 3:
-        return i[1] + b' = ' + i[1] + b' >> ' + i[2]
+        return i[1] + b' = ' + i[1] + b' << ' + i[2]
     elif len(i) == 4:
         return i[1] + b' = ' + i[-2] + b' << ' + i[-1] 
     else:
@@ -256,7 +256,7 @@ def store_d(i):
     if len(i) == 4:
         out1 = b'*( ' + i[3] + b') = ' + i[1]
         out2 = b'*( ' + i[3] + b' + 4) = ' + i[2]
-    if len(i) == 5:
+    elif len(i) == 5:
         out1 = b'*( ' + i[3] + b' + ' + i[4] + b' ) = ' + i[1]
         out2 = b'*( ' + i[3] + b' + ' + i[4] + b' + 4 ) = ' + i[2]
     else:
@@ -366,5 +366,4 @@ if __name__ == "__main__":
     out_file = open(args.output_file, 'wb')
 
     out_file.write(output)
-
 

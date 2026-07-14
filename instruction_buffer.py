@@ -1,19 +1,54 @@
 import subprocess
 import struct
+import re
 
 from instructions import *
 
 def disassemble_section(section_bytes):
-    cmd = [ b'rasm2',
+    cmd = [
+            b'rasm2',
             b'-a', b'arm.gnu', ## only disassembly that works
             b'-b', b'16', ## bit == thumb
-            b'-c', b'm4', ## cpu set
             b'-d',        ## disassemble
-            b'-D',        ## give me location information and stuff
+            section_bytes
+            ]
+    analysis_cmd = [
+            b'rasm2',
+            b'-a', b'arm.gnu',
+            b'-b', b'16',
+            b'-A',
             section_bytes
             ]
     command_result = subprocess.run(cmd, capture_output=True)
-    return command_result.stdout
+    analysis_result = subprocess.run(analysis_cmd, capture_output=True)
+    return normalize_rasm2_output(command_result.stdout, analysis_result.stdout)
+
+def normalize_rasm2_output(disassembly, analysis):
+    instructions = [
+        line.strip()
+        for line in disassembly.split(b'\n')
+        if line.strip()
+    ]
+    byte_strings = re.findall(br'^bytes:\s+([0-9a-fA-F]+)$', analysis, re.MULTILINE)
+
+    if len(instructions) != len(byte_strings):
+        return disassembly
+
+    loc = 0
+    normalized = []
+    for insn, byte_string in zip(instructions, byte_strings):
+        size = len(byte_string) // 2
+        normalized.append(
+            b' '.join([
+                bytes(hex(loc), 'utf-8'),
+                bytes(str(size), 'utf-8'),
+                byte_string,
+                insn,
+            ])
+        )
+        loc += size
+
+    return b'\n'.join(normalized) + b'\n'
 
 def fix_jump_offset(jump_offset):
     if int(jump_offset, 0) > 0x7FFFFFF:
@@ -29,6 +64,13 @@ def twos_complement(hexstr):
     if value & (1 << (bits-1)):
         value -= 1 << bits
     return value
+
+def is_probable_address_literal(value):
+    return (
+        0x08020000 <= value < 0x08040000 or
+        0x20000000 <= value < 0x60000000 or
+        0xE0000000 <= value < 0xE0100000
+    )
 
 class InstructionsBuffer:
 
@@ -50,10 +92,10 @@ class InstructionsBuffer:
         by = bytes(self.binary[true_loc:true_loc+n_bytes].hex(), 'utf-8')
         insns = disassemble_section(by)
         insns1 = []
-        insns = [i for i in filter(lambda i: i is not b'', insns.split(b'\n'))]
-        for j in range(len(insns) - 1):
+        insns = [i for i in filter(lambda i: i != b'', insns.split(b'\n'))]
+        for j in range(len(insns)):
             i = insns[j]
-            insn = list(filter(lambda p: p is not b'', i.split(b' ')))
+            insn = list(filter(lambda p: p != b'', i.split(b' ')))
 
             insn[0] = bytes(hex((loc + int(insn[0], 0))), 'utf-8')
             
@@ -96,10 +138,6 @@ class InstructionsBuffer:
                 f = False
                 if insn[5] == b'[pc,':
                     curr_loc = int(insn[0], 0)
-                    insn_len = int(insn[1])
-                    next_insn_line = insns[j+1]
-                    next_insn = list(filter(lambda p: p is not b'', next_insn_line.split(b' ')))
-                    next_insn_len = int(next_insn[1])
                     data_offset = int(insn[6].rstrip(b']'), 0)
                     if 0x7ffffff > data_offset > 1024:
                         data_offset = 1024 - data_offset
@@ -162,8 +200,7 @@ class InstructionsBuffer:
             # pre-emptively exclude things which might be in 
             # program mem (0x0802...) or stack (0x2..) or periphs (0x3... 0x4... 0x5...)
             # write it as an address, little endian rotation
-            if 0x8020000 < data_val or data_val < 0x8040000 or\
-                    0x20000000 < data_val or data_val < 0x50000000:
+            if is_probable_address_literal(data_val):
                 data_val = bytes(hex(data_val), 'utf-8')
             else:
                 data_val = bytes(str(data_val), 'utf-8')

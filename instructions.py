@@ -57,7 +57,7 @@ exchange_func_call = [ b'blx' ]
 
 uncond_block_end = [ b'b', b'b.n',b'b.w' ]
 
-tbb = [b'tbb', b'tbb.n', b'tbb.w', b'tbh', b'tbh.n', 'tbh.w']
+tbb = [b'tbb', b'tbb.n', b'tbb.w', b'tbh', b'tbh.n', b'tbh.w']
 
 branch = cond_block_end + uncond_block_end + cond_block_end_zero + tbb
 
@@ -102,5 +102,4 @@ coprocessor = [ b'stc2l', b'ldc2l' ]
 moves = [ b'mov', b'movw', b'movs', b'movs.w',  b'vmov.f32', b'mov.w', b'vmov', b'vmrs'] 
 n_moves = [ b'mvn', b'mvn.w', b'mvns' ]
 move = moves + n_moves
-
 

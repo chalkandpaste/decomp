@@ -1,1 +1,17 @@
 *.bin
+*.py[cod]
+__pycache__/
+.DS_Store
+
+.coverage
+.pytest_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+
+asm/
+bgc/
+c/
+cf/
+scratch/temp.c

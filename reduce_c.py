@@ -1,7 +1,9 @@
 from pycparser import parse_file, c_generator, c_ast, c_parser
 import argparse
 
+import os
 import sys
+import tempfile
 
 global while_killer
 global func_killer
@@ -428,12 +430,14 @@ def reduce_c(raw, fk = False, wk = False):
     global var_counter
     var_counter = 0
    
-    f = open('scratch/temp.c', 'wb')
-    f.write(raw)
-    f.close()
+    with tempfile.NamedTemporaryFile(suffix='.c', delete=False) as f:
+        f.write(raw)
+        temp_path = f.name
 
-    
-    ast = parse_file('scratch/temp.c', use_cpp=True)
+    try:
+        ast = parse_file(temp_path, use_cpp=True)
+    finally:
+        os.unlink(temp_path)
    
     try:
         body = ast.ext[0].body
@@ -474,4 +478,3 @@ if __name__ == "__main__":
     out = open(args.output_file, 'wb')
 
     out.write(output)
-

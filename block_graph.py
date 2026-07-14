@@ -5,6 +5,8 @@ import pickle
 import os.path
 import argparse
 
+CACHE_VERSION = 2
+
 # type block_graph
 # {
 # 'index' : block_index,
@@ -113,7 +115,7 @@ def recurse_blocks(block, block_index, f, base_case, direction):
 
 def check_bg_cache(entry_point_loc):
 
-    fp = 'bgc/' + hex(entry_point_loc)
+    fp = 'bgc/v' + str(CACHE_VERSION) + '-' + hex(entry_point_loc)
     
     if os.path.isfile(fp):
         return pickle.load(open(fp, 'rb'))
@@ -123,7 +125,9 @@ def check_bg_cache(entry_point_loc):
 def cache_bg(entry_point_loc, block_graph):
 
     # print('caching')
-    pickle.dump(block_graph, open('bgc/'+hex(entry_point_loc), 'wb'))
+    os.makedirs('bgc', exist_ok=True)
+    fp = 'bgc/v' + str(CACHE_VERSION) + '-' + hex(entry_point_loc)
+    pickle.dump(block_graph, open(fp, 'wb'))
 
 def generate_block_graph(binary, entry_point_loc, use_cache=True, override_input=None):
     print('generate_block_graph', hex(entry_point_loc))
@@ -284,7 +288,8 @@ def generate_block_graph(binary, entry_point_loc, use_cache=True, override_input
 
     ## Block cache
     
-    cache_bg(entry_point_loc, block_graph)
+    if use_cache and override_input is None:
+        cache_bg(entry_point_loc, block_graph)
 
     return block_graph
 
