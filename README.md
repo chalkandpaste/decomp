@@ -93,6 +93,7 @@ decomp-parity check firmware.bin build/parity.json
 src/decomp/
   core/                 typed firmware/program/CFG/instruction model
   arch/                 architecture backend interfaces and ARM Thumb scaffold
+  analysis/             typed analysis passes such as CFG construction
   cli.py                 main decompiler CLI
   parity.py             legacy parity snapshot capture/check CLI
   legacy_adapter.py     bridge from old dict/list graphs to typed CFGs

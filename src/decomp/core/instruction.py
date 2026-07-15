@@ -40,6 +40,7 @@ class Instruction:
     operands: tuple[Operand, ...] = ()
     flow: FlowInfo = field(default_factory=FlowInfo)
     raw_tokens: tuple[bytes, ...] = ()
+    legacy_tokens: tuple[object, ...] = ()
     source: str = "unknown"
 
     @property

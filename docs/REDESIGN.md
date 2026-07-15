@@ -87,6 +87,9 @@ when the DD2 binary or `rasm2` is unavailable.
    `ArmThumbBackend`; old callers still receive legacy token lists, while new
    callers can request typed instructions.
 4. Replace `block_graph.py` with a typed CFG builder.
+   Initial status: `decomp.analysis.cfg_builder` now builds typed
+   `ControlFlowGraph` objects, and `block_graph.py` converts them back to the
+   legacy dict/list shape for downstream passes.
 5. Replace function discovery with an xref pass over typed instructions.
 6. Replace signature inference with backend-provided register/ABI effects.
 7. Introduce low-level IR before C emission.

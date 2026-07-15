@@ -123,6 +123,7 @@ class ArmThumbBackend:
             operands=provisional.operands,
             flow=self._classify_legacy_flow(tokens, address, size),
             raw_tokens=provisional.raw_tokens,
+            legacy_tokens=tuple(tokens),
             source=provisional.source,
         )
 
