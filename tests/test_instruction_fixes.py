@@ -3,6 +3,8 @@ import unittest
 
 from decomp import convert_c
 from decomp import instructions
+from decomp.arch.arm_thumb import ArmThumbBackend
+from decomp.core import FlowKind
 from decomp.instruction_buffer import InstructionsBuffer, is_probable_address_literal
 
 
@@ -27,6 +29,61 @@ class InstructionBufferLiteralTests(unittest.TestCase):
         buf = self.make_buffer(1234)
 
         self.assertEqual(buf.read_data_at_loc(0x08020000, 4), b"1234")
+
+    def test_wrapper_exposes_typed_instruction_buffer(self):
+        buf = object.__new__(InstructionsBuffer)
+        buf.backend = ArmThumbBackend()
+        buf.insns_buff = [
+            [b"0x8020000", b"2", b"0000", b"cmp", b"r0,", b"0"],
+            [b"0x8020002", b"2", b"0000", b"beq", b"0x8020008"],
+        ]
+        buf.typed_insns_buff = tuple(buf.backend.decode_legacy_tokens(tokens) for tokens in buf.insns_buff)
+        buf.insns_buff_index = {0x08020000: 0, 0x08020002: 1}
+
+        typed = buf.read_typed_insns_at_loc(0x08020002)
+
+        self.assertEqual(typed[0].mnemonic, "beq")
+        self.assertEqual(typed[0].flow.kind, FlowKind.CONDITIONAL_BRANCH)
+        self.assertEqual(typed[0].flow.targets, (0x08020008,))
+
+
+class ArmThumbBackendDecodeTests(unittest.TestCase):
+    def test_backend_reads_literals_with_current_address_formatting(self):
+        backend = ArmThumbBackend()
+        binary = struct.pack("<I", 0x08021000)
+
+        self.assertEqual(
+            backend.read_data_at_loc(binary, 0x08020000, 4, base_address=0x08020000),
+            b"0x8021000",
+        )
+
+    def test_backend_decodes_legacy_tokens_to_typed_instruction(self):
+        backend = ArmThumbBackend()
+
+        instruction = backend.decode_legacy_tokens(
+            [b"0x8020002", b"2", b"0000", b"beq", b"0x8020008"]
+        )
+
+        self.assertEqual(instruction.address, 0x08020002)
+        self.assertEqual(instruction.mnemonic, "beq")
+        self.assertEqual(instruction.flow.kind, FlowKind.CONDITIONAL_BRANCH)
+        self.assertEqual(instruction.flow.targets, (0x08020008,))
+
+    def test_backend_normalizes_branch_targets_against_decode_window(self):
+        class FakeBackend(ArmThumbBackend):
+            def disassemble_section(self, _section_bytes):
+                return b"0x2 2 0000 beq 0x8\n"
+
+        backend = FakeBackend()
+
+        tokens = backend.decode_window_as_legacy_tokens(
+            b"\x00" * 32,
+            0x08020000,
+            base_address=0x08020000,
+            size=32,
+        )
+
+        self.assertEqual(tokens[0], [b"0x8020002", b"2", b"0000", b"beq", b"0x8020008"])
 
 
 class ConvertInstructionTests(unittest.TestCase):

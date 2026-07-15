@@ -21,11 +21,33 @@ class ArchitectureBackend(Protocol):
     display_name: str
     disassembler: DisassemblerConfig
 
+    def decode_window(
+        self,
+        binary: bytes,
+        address: int,
+        *,
+        base_address: int = 0x08020000,
+        size: int = 4096,
+    ) -> tuple[Instruction, ...]:
+        """Decode a window of firmware bytes into typed instructions."""
+
     def decode_legacy_tokens(self, tokens: list[object]) -> Instruction:
         """Convert current legacy token lists into typed instructions."""
 
     def classify_flow(self, instruction: Instruction) -> FlowInfo:
         """Return architecture-specific control-flow information."""
+
+    def read_data_at_loc(
+        self,
+        binary: bytes,
+        address: int,
+        length: int,
+        *,
+        base_address: int = 0x08020000,
+        signed: bool = False,
+        float_value: bool = False,
+    ) -> bytes:
+        """Read and format an architecture-profile literal value."""
 
     def is_probable_code_address(self, image: FirmwareImage, value: int) -> bool:
         """Return whether a literal can plausibly reference code for this target."""

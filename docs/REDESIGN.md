@@ -83,6 +83,9 @@ when the DD2 binary or `rasm2` is unavailable.
 1. Keep parity snapshots green against known firmware.
 2. Move legacy block-graph output through typed adapters.
 3. Replace `instruction_buffer.py` with an architecture-backed decoder.
+   Initial status: `InstructionsBuffer` is now a compatibility wrapper around
+   `ArmThumbBackend`; old callers still receive legacy token lists, while new
+   callers can request typed instructions.
 4. Replace `block_graph.py` with a typed CFG builder.
 5. Replace function discovery with an xref pass over typed instructions.
 6. Replace signature inference with backend-provided register/ABI effects.

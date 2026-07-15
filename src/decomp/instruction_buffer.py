@@ -1,227 +1,58 @@
-import subprocess
-import struct
-import re
+from .arch.arm_thumb.backend import (
+    ArmThumbBackend,
+    fix_jump_offset,
+    is_probable_address_literal,
+    normalize_rasm2_output,
+    twos_complement,
+)
 
-from .instructions import *
 
 def disassemble_section(section_bytes):
-    cmd = [
-            b'rasm2',
-            b'-a', b'arm.gnu', ## only disassembly that works
-            b'-b', b'16', ## bit == thumb
-            b'-d',        ## disassemble
-            section_bytes
-            ]
-    analysis_cmd = [
-            b'rasm2',
-            b'-a', b'arm.gnu',
-            b'-b', b'16',
-            b'-A',
-            section_bytes
-            ]
-    command_result = subprocess.run(cmd, capture_output=True)
-    analysis_result = subprocess.run(analysis_cmd, capture_output=True)
-    return normalize_rasm2_output(command_result.stdout, analysis_result.stdout)
+    return ArmThumbBackend().disassemble_section(section_bytes)
 
-def normalize_rasm2_output(disassembly, analysis):
-    instructions = [
-        line.strip()
-        for line in disassembly.split(b'\n')
-        if line.strip()
-    ]
-    byte_strings = re.findall(br'^bytes:\s+([0-9a-fA-F]+)$', analysis, re.MULTILINE)
-
-    if len(instructions) != len(byte_strings):
-        return disassembly
-
-    loc = 0
-    normalized = []
-    for insn, byte_string in zip(instructions, byte_strings):
-        size = len(byte_string) // 2
-        normalized.append(
-            b' '.join([
-                bytes(hex(loc), 'utf-8'),
-                bytes(str(size), 'utf-8'),
-                byte_string,
-                insn,
-            ])
-        )
-        loc += size
-
-    return b'\n'.join(normalized) + b'\n'
-
-def fix_jump_offset(jump_offset):
-    if int(jump_offset, 0) > 0x7FFFFFF:
-        jump_offset = twos_complement(jump_offset)
-    else:
-        jump_offset = int(jump_offset, 0)
-
-    return jump_offset
-
-def twos_complement(hexstr):
-    bits = len(hexstr[2:]) * 4
-    value = int(hexstr, 0)
-    if value & (1 << (bits-1)):
-        value -= 1 << bits
-    return value
-
-def is_probable_address_literal(value):
-    return (
-        0x08020000 <= value < 0x08040000 or
-        0x20000000 <= value < 0x60000000 or
-        0xE0000000 <= value < 0xE0100000
-    )
 
 class InstructionsBuffer:
-
-    def __init__(self, binary, entry_point_loc = 0x08020004, binary_offset_loc=0x08020000, n_bytes=4096):
-        # bin_obj
+    def __init__(self, binary, entry_point_loc=0x08020004, binary_offset_loc=0x08020000, n_bytes=4096):
         self.binary = binary
         self.binary_offset_loc = binary_offset_loc
-
-        # insns_buffer
         self.buff_len_bytes = n_bytes
+        self.backend = ArmThumbBackend()
         self.update_loc(entry_point_loc)
 
-    # type
-    # { 'offset' : 0x08020000, 'binary' : binary }
-
     def read_instructions_binary(self, loc):
-        true_loc = loc - self.binary_offset_loc
-        n_bytes = self.buff_len_bytes
-        by = bytes(self.binary[true_loc:true_loc+n_bytes].hex(), 'utf-8')
-        insns = disassemble_section(by)
-        insns1 = []
-        insns = [i for i in filter(lambda i: i != b'', insns.split(b'\n'))]
-        for j in range(len(insns)):
-            i = insns[j]
-            insn = list(filter(lambda p: p != b'', i.split(b' ')))
+        return self._backend().decode_window_as_legacy_tokens(
+            self.binary,
+            loc,
+            base_address=self.binary_offset_loc,
+            size=self.buff_len_bytes,
+        )
 
-            insn[0] = bytes(hex((loc + int(insn[0], 0))), 'utf-8')
-            
-            if insn[3] in cond_block_end + uncond_block_end + func_call:
-                jump_offset = fix_jump_offset(insn[4])
-                insn[4] = bytes(hex(loc + jump_offset), 'utf-8')
-            
-            elif insn[3] in cond_block_end_zero:
-                jump_offset = fix_jump_offset(insn[5])
-                insn[5] = bytes(hex(loc + jump_offset), 'utf-8')
-           
-            elif insn[3] in tbb:
-                if insn[3] == b'tbb':
-                    tbb_loc = int(insn[0], 0) + int(insn[1])
-
-                    locs = []
-                    
-                    end = False
-                    index = 0
-                    while not end:
-                        offset = int(self.read_data_at_loc(tbb_loc + index, 1))
-                        if offset == 0:
-                            end = True
-                        else:
-                            locs.append(tbb_loc + 2*offset)
-                            index += 1
-
-                    insn.append(locs)
-
-                else:
-                    print(insn)
-                    raise Exception
-
-            elif insn[3] == b'vmov.f32':
-                if len(insn) > 6:
-                    insn[5] = insn[8]
-                insn = insn[0:6]
-
-            elif insn[3] in load:
-                f = False
-                if insn[5] == b'[pc,':
-                    curr_loc = int(insn[0], 0)
-                    data_offset = int(insn[6].rstrip(b']'), 0)
-                    if 0x7ffffff > data_offset > 1024:
-                        data_offset = 1024 - data_offset
-                    elif data_offset > 0x7fffffff or data_offset < -1024:
-                        data_offset = twos_complement(insn[6].rstrip(b']'))
-                    
-                    data_loc = curr_loc + 4 + data_offset
-                    off_word = data_loc % 4
-
-                    data_loc -= off_word
-                    
-                    if insn[3] in load_u32:
-                        data_val = self.read_data_at_loc(data_loc, 4)
-                    elif insn[3] in load_u16:
-                        data_val = self.read_data_at_loc(data_loc, 2)
-                    elif insn[3] in load_s16:
-                        data_val = self.read_data_at_loc(data_loc, 2, signed=True)
-                    elif insn[3] in load_u8:
-                        data_val = self.read_data_at_loc(data_loc, 1)
-                    elif insn[3] in load_s8:
-                        data_val = self.read_data_at_loc(data_loc, 1, signed=True)
-                    elif insn[3] in load_fp:
-                        f = True
-                        if insn[4].startswith(b'd'):
-                            data_val = self.read_data_at_loc(data_loc, 8, f = True)
-                        if insn[4].startswith(b's'):
-                            data_val = self.read_data_at_loc(data_loc, 4, f = True)
-                    else:
-                        raise Exception
-
-                    insn[3] = b'mov' if not f else b'vmov'
-                    insn[5] = data_val
-                    insn = insn[0:6]
-           
-            insns1.append(insn)
-
-        return insns1
+    def read_typed_instructions_binary(self, loc):
+        return self._backend().decode_window(
+            self.binary,
+            loc,
+            base_address=self.binary_offset_loc,
+            size=self.buff_len_bytes,
+        )
 
     def update_loc(self, new_loc):
         self.curr_offset_loc = new_loc
         self.insns_buff = self.read_instructions_binary(self.curr_offset_loc)
-        self.insns_buff_index = { int(v[0],0) : i for (i,v) in enumerate(self.insns_buff) }
+        self.typed_insns_buff = tuple(
+            self._backend().decode_legacy_tokens(tokens)
+            for tokens in self.insns_buff
+        )
+        self.insns_buff_index = {int(v[0], 0): i for (i, v) in enumerate(self.insns_buff)}
 
-    def read_data_at_loc(self, loc, length, signed = False, f = False):
-        data_loc = loc - self.binary_offset_loc
-        data = self.binary[data_loc:data_loc + length]
-
-        if length == 8 and f:
-            # data = data[4:8] + data[0:4]
-            data_val, = struct.unpack('<d', data)
-            data_val = bytes(str(data_val), 'utf-8')
-        elif length == 4 and f:
-            data_val, = struct.unpack('<f', data)
-            data_val = bytes(str(data_val), 'utf-8')
-        elif length == 4:
-            if signed:
-                data_val, = struct.unpack('<i', data)
-            else:
-                data_val, = struct.unpack('<I', data)
-            # pre-emptively exclude things which might be in 
-            # program mem (0x0802...) or stack (0x2..) or periphs (0x3... 0x4... 0x5...)
-            # write it as an address, little endian rotation
-            if is_probable_address_literal(data_val):
-                data_val = bytes(hex(data_val), 'utf-8')
-            else:
-                data_val = bytes(str(data_val), 'utf-8')
-        elif length == 2:
-            if signed:
-                data_val, = struct.unpack('<h', data)
-            else:
-                data_val, = struct.unpack('<H', data)
-            data_val = bytes(str(data_val), 'utf-8')
-        elif length == 1:
-            if signed:
-                data_val, = struct.unpack('<b', data)
-            else:
-                data_val, = struct.unpack('<B', data)
-            data_val = bytes(str(data_val), 'utf-8')
-        else:
-            raise Exception
-
-        return data_val
-
-
+    def read_data_at_loc(self, loc, length, signed=False, f=False):
+        return self._backend().read_data_at_loc(
+            self.binary,
+            loc,
+            length,
+            base_address=self.binary_offset_loc,
+            signed=signed,
+            float_value=f,
+        )
 
     def read_insns_at_loc(self, loc):
         if loc in self.insns_buff_index:
@@ -231,3 +62,17 @@ class InstructionsBuffer:
             idx = self.insns_buff_index[loc]
 
         return self.insns_buff[idx:]
+
+    def read_typed_insns_at_loc(self, loc):
+        if loc in self.insns_buff_index:
+            idx = self.insns_buff_index[loc]
+        else:
+            self.update_loc(loc)
+            idx = self.insns_buff_index[loc]
+
+        return self.typed_insns_buff[idx:]
+
+    def _backend(self):
+        if not hasattr(self, "backend"):
+            self.backend = ArmThumbBackend()
+        return self.backend
