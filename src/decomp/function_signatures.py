@@ -1,4 +1,6 @@
 from .block_graph import generate_block_graph, recurse_graph
+from .analysis import collect_function_addresses
+from .legacy_adapter import legacy_block_graph_to_cfg
 
 from .loop_tracker import LoopTracker
 from .instructions import *
@@ -52,45 +54,8 @@ def add_function_sigs(block_graph, function_sigs):
     return block_graph
 
 def collect_functions(block_graph):
-    start_block = block_graph['start_block']
-    block_index = block_graph['index']
-    start_loc = start_block['loc']
-
-    def literal_loaded_into_register(insns, index, register):
-        for prev in reversed(insns[:index]):
-            if prev[3] in move and len(prev) >= 6 and crs(prev[4]) == register:
-                try:
-                    return int(prev[5], 0) & ~1
-                except ValueError:
-                    return None
-        return None
-
-    def collect (block, _, functions):
-        insns = block['block']
-        for i in range(len(insns)):
-            insn = insns[i]
-            if insn[3] in func_call:
-                functions.append(int(insn[4], 0) & ~1)
-            elif insn[3] in exchange_func_call + exchange_return and len(insn) >= 5:
-                register = crs(insn[4])
-                if register != b'lr':
-                    target = literal_loaded_into_register(insns, i, register)
-                    if target is not None:
-                        functions.append(target)
-            elif insn[3] in uncond_block_end:
-                target = int(insn[4], 0) & ~1
-                if block['loc'] == start_loc and target < start_loc:
-                    functions.append(target)
-            elif insn[3] in func_end:
-                for j in range(i, len(insns)):
-                    insn1 = insns[j]
-                    if insn1[3] in uncond_block_end:
-                        functions.append(int(insn1[4], 0) & ~1)
-        return functions
-
-    functions = recurse_graph(block_graph, collect, [], True)
-
-    return list(set(functions))
+    cfg = legacy_block_graph_to_cfg(block_graph)
+    return collect_function_addresses(cfg)
 
 def get_function_signature(block_graph):
     start_block = block_graph['start_block']

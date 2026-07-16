@@ -33,7 +33,7 @@ def legacy_block_graph_to_cfg(block_graph, backend=None) -> ControlFlowGraph:
         )
         blocks[address] = BasicBlock(
             address=block["loc"],
-            end=block["end_loc"],
+            end=_legacy_block_end(block, instructions),
             instructions=instructions,
             outgoing=tuple(outgoing.get(address, ())),
             incoming=tuple(incoming.get(address, ())),
@@ -41,6 +41,15 @@ def legacy_block_graph_to_cfg(block_graph, backend=None) -> ControlFlowGraph:
         )
 
     return ControlFlowGraph(entry=start, blocks=blocks)
+
+
+def _legacy_block_end(block, instructions):
+    if "end_loc" in block:
+        return block["end_loc"]
+    if instructions:
+        last = instructions[-1]
+        return last.address + last.size
+    return block["loc"]
 
 
 def _edge_kind_for_child(index: int, child_count: int) -> EdgeKind:

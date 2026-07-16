@@ -91,6 +91,9 @@ when the DD2 binary or `rasm2` is unavailable.
    `ControlFlowGraph` objects, and `block_graph.py` converts them back to the
    legacy dict/list shape for downstream passes.
 5. Replace function discovery with an xref pass over typed instructions.
+   Initial status: `decomp.analysis.xrefs` now collects typed call references
+   from `ControlFlowGraph`; `function_signatures.collect_functions()` adapts the
+   legacy graph shape to the typed pass.
 6. Replace signature inference with backend-provided register/ABI effects.
 7. Introduce low-level IR before C emission.
 8. Move STM32/DD2-specific assumptions into project profiles.
