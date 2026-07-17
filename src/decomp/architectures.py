@@ -95,7 +95,7 @@ ARCHITECTURES = {
 }
 
 
-def get_architecture(arch_id):
+def get_architecture(arch_id: str) -> ArchitectureSpec:
     try:
         return ARCHITECTURES[arch_id]
     except KeyError as exc:
@@ -103,5 +103,5 @@ def get_architecture(arch_id):
         raise ValueError(f"unknown architecture {arch_id!r}; known: {known}") from exc
 
 
-def list_architectures():
+def list_architectures() -> list[ArchitectureSpec]:
     return [ARCHITECTURES[key] for key in sorted(ARCHITECTURES)]

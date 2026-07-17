@@ -7,7 +7,7 @@ from decomp.analysis import LegacyTokenInstructionSource, build_control_flow_gra
 
 
 class BlockGraphTests(unittest.TestCase):
-    def test_conditional_branch_splits_into_true_and_false_blocks(self):
+    def test_conditional_branch_splits_into_true_and_false_blocks(self) -> None:
         insns = [
             [b"0x8020000", b"2", b"0000", b"cmp", b"r0,", b"0"],
             [b"0x8020002", b"2", b"0000", b"beq", b"0x8020008"],
@@ -33,7 +33,7 @@ class BlockGraphTests(unittest.TestCase):
         self.assertEqual(graph["index"][0x08020004]["parents"], [0x08020000])
         self.assertEqual(graph["index"][0x08020008]["parents"], [0x08020000])
 
-    def test_unconditional_branch_has_single_jump_child(self):
+    def test_unconditional_branch_has_single_jump_child(self) -> None:
         insns = [
             [b"0x8020000", b"2", b"0000", b"b", b"0x8020008"],
             [b"0x8020008", b"2", b"0000", b"bx", b"lr"],
@@ -50,7 +50,7 @@ class BlockGraphTests(unittest.TestCase):
         self.assertEqual(graph["index"][0x08020000]["children"], [0x08020008])
         self.assertEqual(graph["index"][0x08020008]["parents"], [0x08020000])
 
-    def test_return_block_has_no_children(self):
+    def test_return_block_has_no_children(self) -> None:
         insns = [
             [b"0x8020000", b"2", b"0000", b"mov", b"r0,", b"1"],
             [b"0x8020002", b"2", b"0000", b"bx", b"lr"],
@@ -66,7 +66,7 @@ class BlockGraphTests(unittest.TestCase):
 
         self.assertEqual(graph["index"][0x08020000]["children"], [])
 
-    def test_typed_cfg_builder_trims_overlapping_blocks(self):
+    def test_typed_cfg_builder_trims_overlapping_blocks(self) -> None:
         insns = [
             [b"0x8020000", b"2", b"0000", b"cmp", b"r0,", b"0"],
             [b"0x8020002", b"2", b"0000", b"beq", b"0x8020006"],

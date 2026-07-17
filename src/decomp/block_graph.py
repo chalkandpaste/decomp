@@ -6,10 +6,18 @@ from .analysis.cfg_builder import (
     build_control_flow_graph,
     cfg_to_legacy_block_graph,
 )
+from .legacy_types import (
+    LegacyBlock,
+    LegacyBlockGraph,
+    LegacyBlockIndex,
+    LegacyInstruction,
+    LegacyTraversalFn,
+)
 
 import pickle
 import os.path
 import argparse
+from typing import Any
 
 CACHE_VERSION = 3
 
@@ -40,7 +48,7 @@ CACHE_VERSION = 3
 # ...
 # }
 
-def get_children(block_list):
+def get_children(block_list: list[LegacyInstruction]) -> list[int]:
     last_insn = block_list[-1]
     end_insn = last_insn[3]
     if end_insn in cond_block_end:
@@ -75,22 +83,38 @@ def get_children(block_list):
 
     return children
 
-def mk_block(loc, block, end_loc, children = [], parents = []):
+def mk_block(
+    loc: int,
+    block: list[LegacyInstruction],
+    end_loc: int,
+    children: list[int] | None = None,
+    parents: list[int] | None = None,
+) -> LegacyBlock:
+    if children is None:
+        children = []
+    if parents is None:
+        parents = []
     return {
             'loc'        : loc,
             'end_loc'    : end_loc,
             'block'      : block,
             'children'   : children,
-            'parents'    : [], # parents
+            'parents'    : parents,
             'depth'      : 0
             }
 
-def recurse_graph(block_graph, f, base_case, direction):
+def recurse_graph(block_graph: LegacyBlockGraph, f: LegacyTraversalFn, base_case: Any, direction: bool) -> Any:
     start_block = block_graph['start_block']
     block_index = block_graph['index']
     return recurse_blocks(start_block, block_index, f, base_case, direction)
 
-def recurse_blocks(block, block_index, f, base_case, direction):
+def recurse_blocks(
+    block: LegacyBlock,
+    block_index: LegacyBlockIndex,
+    f: LegacyTraversalFn,
+    base_case: Any,
+    direction: bool,
+) -> Any:
 
     out = base_case
 
@@ -119,7 +143,7 @@ def recurse_blocks(block, block_index, f, base_case, direction):
 
     return out
 
-def check_bg_cache(entry_point_loc):
+def check_bg_cache(entry_point_loc: int) -> LegacyBlockGraph | None:
 
     fp = 'bgc/v' + str(CACHE_VERSION) + '-' + hex(entry_point_loc)
     
@@ -129,7 +153,7 @@ def check_bg_cache(entry_point_loc):
     else:
         return None
 
-def cache_bg(entry_point_loc, block_graph):
+def cache_bg(entry_point_loc: int, block_graph: LegacyBlockGraph) -> None:
 
     # print('caching')
     os.makedirs('bgc', exist_ok=True)
@@ -137,7 +161,12 @@ def cache_bg(entry_point_loc, block_graph):
     with open(fp, 'wb') as handle:
         pickle.dump(block_graph, handle)
 
-def generate_block_graph(binary, entry_point_loc, use_cache=True, override_input=None):
+def generate_block_graph(
+    binary: bytes | None,
+    entry_point_loc: int,
+    use_cache: bool = True,
+    override_input: list[LegacyInstruction] | None = None,
+) -> LegacyBlockGraph:
     print('generate_block_graph', hex(entry_point_loc))
 
     if use_cache:
@@ -158,7 +187,7 @@ def generate_block_graph(binary, entry_point_loc, use_cache=True, override_input
 
     return block_graph
 
-def print_block_graph(block_graph):
+def print_block_graph(block_graph: LegacyBlockGraph) -> bytes:
     block_index = block_graph['index']
 
     locs = [k for k in block_index.keys()]
@@ -185,7 +214,12 @@ def print_block_graph(block_graph):
     
     return b'\n'.join(out2)
 
-def generate_asm(binary, entry_point_loc, cache=True, override=None):
+def generate_asm(
+    binary: bytes | None,
+    entry_point_loc: int,
+    cache: bool = True,
+    override: list[LegacyInstruction] | None = None,
+) -> bytes:
 
     block_graph = generate_block_graph(binary, entry_point_loc, cache, override)
 

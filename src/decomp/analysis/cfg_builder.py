@@ -28,7 +28,7 @@ class InstructionSource(Protocol):
 
 
 class InstructionsBufferSource:
-    def __init__(self, buffer: InstructionsBuffer):
+    def __init__(self, buffer: InstructionsBuffer) -> None:
         self.buffer = buffer
 
     def read_at(self, address: int) -> tuple[Instruction, ...]:
@@ -39,7 +39,7 @@ class InstructionsBufferSource:
 
 
 class LegacyTokenInstructionSource:
-    def __init__(self, legacy_tokens: list[list[object]], backend=None):
+    def __init__(self, legacy_tokens: list[list[object]], backend: ArmThumbBackend | None = None) -> None:
         self.legacy_tokens = legacy_tokens
         self.backend = backend or ArmThumbBackend()
         self.instructions = tuple(

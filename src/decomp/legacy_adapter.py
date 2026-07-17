@@ -3,9 +3,11 @@ from __future__ import annotations
 from decomp.arch.arm_thumb import ArmThumbBackend
 from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
 from decomp.core.flow import EdgeKind
+from decomp.core.instruction import Instruction
+from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 
 
-def legacy_block_graph_to_cfg(block_graph, backend=None) -> ControlFlowGraph:
+def legacy_block_graph_to_cfg(block_graph: LegacyBlockGraph, backend: ArmThumbBackend | None = None) -> ControlFlowGraph:
     backend = backend or ArmThumbBackend()
     start = block_graph["start_block"]["loc"]
     legacy_blocks = block_graph["index"]
@@ -43,7 +45,7 @@ def legacy_block_graph_to_cfg(block_graph, backend=None) -> ControlFlowGraph:
     return ControlFlowGraph(entry=start, blocks=blocks)
 
 
-def _legacy_block_end(block, instructions):
+def _legacy_block_end(block: LegacyBlock, instructions: tuple[Instruction, ...]) -> int:
     if "end_loc" in block:
         return block["end_loc"]
     if instructions:

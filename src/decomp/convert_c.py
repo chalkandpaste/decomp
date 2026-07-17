@@ -1,10 +1,15 @@
 import pickle
 import re
 import argparse
+from typing import Any, TypeAlias
 
 from . import instructions as ns
 
-def map_sections (sections):
+InstructionTokens: TypeAlias = list[bytes]
+MappedSection: TypeAlias = dict[str, Any]
+
+
+def map_sections(sections: list[MappedSection]) -> list[MappedSection]:
     new_sections = []
     for section in sections:
         if section['type']:
@@ -38,7 +43,7 @@ def map_sections (sections):
 
     return new_sections
 
-def convert_instruction(insn):
+def convert_instruction(insn: InstructionTokens) -> bytes:
     if insn[0] in ns.moves:
         return mov(insn)
     if insn[0] in ns.n_moves:
@@ -96,7 +101,7 @@ def convert_instruction(insn):
 
 
 
-def binop(sign, i):
+def binop(sign: bytes, i: InstructionTokens) -> bytes:
     if len(i) == 3:
         return (i[1] + b' = ' + i[1] + sign + i[2])
     elif len(i) == 4 or (i[0] == b'add' and len(i) == 8): # special case for dumb comments
@@ -111,46 +116,46 @@ def binop(sign, i):
             raise Exception
         return (i[1] + b' = ' + i[2] + sign + b'(' + i[3] + shift + i[5] + b')')
 
-def empty ():
+def empty() -> bytes:
     return b''
 
-def mov(i):
+def mov(i: InstructionTokens) -> bytes:
     return i[1] + b' = ' + i[2]
 
-def n_mov(i):
+def n_mov(i: InstructionTokens) -> bytes:
     return i[1] + b' = ~' + i[2]
 
-def aand(i):
+def aand(i: InstructionTokens) -> bytes:
     return binop(b' & ', i)
 
-def bic(i):
+def bic(i: InstructionTokens) -> bytes:
     return binop(b' & ~', i)
 
-def add(i):
+def add(i: InstructionTokens) -> bytes:
     return binop(b' + ', i)
 
-def sub(i):
+def sub(i: InstructionTokens) -> bytes:
     return binop(b' - ', i)
 
-def rev_sub(i):
+def rev_sub(i: InstructionTokens) -> bytes:
     return i[1] + b' = ' + i[-2] + b' - ' + i[-1]
 
-def mul(i):
+def mul(i: InstructionTokens) -> bytes:
     return i[1] + b' = ' + i[-2] + b' * ' + i[-1]
 
-def smull(i):
+def smull(i: InstructionTokens) -> bytes:
     return i[2] + b' = ' + i[3] + b' * ' + i[4] + b' & 0xFFFFFFFF00000000 >> 32;\n' + i[1] + b' = (unsigned int) (' + i[3] + b' * ' + i[4] + b' & 0xFFFFFFFF )'
 
-def vmlas(i):
+def vmlas(i: InstructionTokens) -> bytes:
     return i[1] + b' =  (' + i[1] + b' + ' + i[2] + b' * ' + i[3] + b' )'
 
-def div(i):
+def div(i: InstructionTokens) -> bytes:
     return i[1] + b' = ' + i[-2] + b' / ' + i[-1]
 
-def orr(i):
+def orr(i: InstructionTokens) -> bytes:
     return binop(b' | ', i)
 
-def bits(i):
+def bits(i: InstructionTokens) -> bytes:
     if i[0] == b'ubfx':
         lsb = int(i[3])
         width = int(i[4])
@@ -178,10 +183,10 @@ def bits(i):
         raise Exception
 
 
-def sxtab(i):
+def sxtab(i: InstructionTokens) -> bytes:
     return i[1] + b' = ' + i[2] + b' + (int) (char) ' + i[3]
 
-def shift_left(i):
+def shift_left(i: InstructionTokens) -> bytes:
     if len(i) == 3:
         return i[1] + b' = ' + i[1] + b' << ' + i[2]
     elif len(i) == 4:
@@ -190,7 +195,7 @@ def shift_left(i):
         print(i)
         raise Exception
 
-def shift_right(i):
+def shift_right(i: InstructionTokens) -> bytes:
     if len(i) == 3:
         return i[1] + b' = ' + i[1] + b' >> ' + i[2]
     elif len(i) == 4:
@@ -199,7 +204,7 @@ def shift_right(i):
         print(i)
         raise Exception
 
-def cast(i):
+def cast(i: InstructionTokens) -> bytes:
     if i[0] in ns.cast_to_float:
         return i[1] + b' = (float) ' + i[2]
     elif i[0] in ns.cast_to_int:
@@ -210,7 +215,7 @@ def cast(i):
         print(i)
         raise Exception
 
-def load(i):
+def load(i: InstructionTokens) -> bytes:
 
     if len(i) < 4:
         addr = i[2]
@@ -224,7 +229,7 @@ def load(i):
 
     return i[1] + b' = *( ' + addr + b' )'
 
-def load_d(i):
+def load_d(i: InstructionTokens) -> bytes:
 
     if len(i) == 4:
         addr = i[3]
@@ -241,7 +246,7 @@ def load_d(i):
     
     return i[1] + b' = *( ' + addr + b' );\n' + i[2] + b' = *( ' + addr + b' + 4 )'
 
-def store(i):
+def store(i: InstructionTokens) -> bytes:
     if len(i) == 3:
         return b'*( ' + i[2] + b' ) = ' + i[1]
     elif len(i) == 4:
@@ -252,7 +257,7 @@ def store(i):
         print(i)
         raise Exception
 
-def store_d(i):
+def store_d(i: InstructionTokens) -> bytes:
     if len(i) == 4:
         out1 = b'*( ' + i[3] + b') = ' + i[1]
         out2 = b'*( ' + i[3] + b' + 4) = ' + i[2]
@@ -266,7 +271,7 @@ def store_d(i):
     return out1 + b';\n' + out2
 # store = (lambda i:  b'*( ' + (i[2] if len(i) < 4 else (i[2] + b' + ' + i[3] if len(i) < 5 else i[2] + b' + ' + i[3] + b' << ' + i[5])) + b' ) = ' + i[1] )
 
-def func_call (i):
+def func_call(i: InstructionTokens) -> bytes:
     if len(i) == 2:
         return b'func_'+i[1]+b'();'
 
@@ -299,7 +304,7 @@ def func_call (i):
 
     return output
 
-def preprocess_input(raw):
+def preprocess_input(raw: bytes) -> list[MappedSection]:
 
     lines = raw.split(b'\n')
 
@@ -326,7 +331,7 @@ def preprocess_input(raw):
     sections.append({'type' : comment_switch, 'section' : section}) ## write the last section
     return sections
 
-def convert_output(sections):
+def convert_output(sections: list[MappedSection]) -> bytes:
     out = []
     for section in sections:
         if section['type']:
@@ -340,7 +345,7 @@ def convert_output(sections):
 
     return b'\n'.join(out)
 
-def convert(raw):
+def convert(raw: bytes) -> bytes:
     
     sections = preprocess_input(raw)
 

@@ -16,7 +16,7 @@ from decomp.project_state import (
 
 
 class ProjectStateTests(unittest.TestCase):
-    def test_initialize_and_rename_function(self):
+    def test_initialize_and_rename_function(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "state.sqlite"
             conn = initialize(
@@ -52,7 +52,7 @@ class ProjectStateTests(unittest.TestCase):
             self.assertEqual(list_functions(reopened)[0]["name"], "system_clock_init")
             reopened.close()
 
-    def test_export_names_as_json(self):
+    def test_export_names_as_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "state.sqlite"
             output_path = Path(temp_dir) / "names.json"
@@ -60,6 +60,7 @@ class ProjectStateTests(unittest.TestCase):
             rename_function(conn, "0x08034f48", "system_clock_init")
 
             export_names(conn, output_path)
+            conn.close()
 
             payload = json.loads(output_path.read_text())
             self.assertEqual(payload["functions"][0]["address"], "0x8034f48")

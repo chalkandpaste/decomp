@@ -1,9 +1,14 @@
 import argparse
+from typing import Any, TypeAlias
 
 from .loop_tracker import LoopTracker
 from .instructions import *
 from .function_signatures import generate_func_sigs, add_function_sigs, get_function_signature
 from .block_graph import generate_block_graph, print_block_graph
+from .legacy_types import LegacyBlock, LegacyBlockGraph, LegacyBlockIndex
+
+MetaBlock: TypeAlias = dict[str, Any]
+MetaBlockGraph: TypeAlias = dict[str, Any]
 
 
 # type if_meta_block -- block to contain if (triangle control flow)
@@ -24,7 +29,7 @@ from .block_graph import generate_block_graph, print_block_graph
 
 class MetaBlockFinder(LoopTracker):
 
-    def __init__(self, block_index):
+    def __init__(self, block_index: LegacyBlockIndex) -> None:
         self.block_index = block_index
         self.loc_to_loop_end = {}
         self.loc_to_loop_start = {}
@@ -32,7 +37,7 @@ class MetaBlockFinder(LoopTracker):
         self.not_loop_loc = {} # locs which are not in a loop
 
 
-    def all_seen_are_reachable(self, reachable, end_loc):
+    def all_seen_are_reachable(self, reachable: list[int], end_loc: int | None) -> bool:
         # print("all_seen_are_reachable", [hex(r) for r in reachable], hex(end_loc))
         if len(reachable) == 0:
             return False
@@ -68,7 +73,7 @@ class MetaBlockFinder(LoopTracker):
     ## Q: why can't another location reach this area?
     ## A: Because of where we start (namely, the beginning) and the assumption that 
     ##       this is structured like C code
-    def get_next_meta_block_loc(self, start_loc, end_loc = None):
+    def get_next_meta_block_loc(self, start_loc: int, end_loc: int | None = None) -> int | None:
         print("get_next_meta_block_loc", hex(start_loc), hex(end_loc) if end_loc is not None else None)
 
         if start_loc == end_loc:
@@ -159,7 +164,7 @@ class MetaBlockFinder(LoopTracker):
         return intersection
 
 
-def annotate_graph(block_graph):
+def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
     print('annotate_graph', hex(block_graph['start_block']['loc']))
 
     start_loc = block_graph['start_block']['loc']
@@ -437,7 +442,7 @@ def annotate_graph(block_graph):
 
     return meta_block_graph
 
-def simplify_if(meta_block_graph):
+def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
     block_index = meta_block_graph['index']
     meta_index = meta_block_graph['meta_block_index']
     start = meta_block_graph['start_block']
@@ -446,7 +451,7 @@ def simplify_if(meta_block_graph):
 
     start_node = meta_index[start]
 
-    def simplify_base_node(node):
+    def simplify_base_node(node: MetaBlock) -> int | None:
         out = b''
         ty = node['type']
         if ty == 'if':
@@ -536,7 +541,7 @@ def simplify_if(meta_block_graph):
             raise Exception
         return node_loc
 
-    def simplify_node(node):
+    def simplify_node(node: MetaBlock | None) -> None:
         while node is not None:
             ty = node['type']
             # manually unwrap and progress while, because it uses `inner` which is a meta_block, not loc
@@ -558,7 +563,7 @@ def simplify_if(meta_block_graph):
             node = meta_index[node_loc] if node_loc is not None else None
         return None
 
-    def simplify_node_loc(node_loc):
+    def simplify_node_loc(node_loc: int) -> None:
         # print("simplify node_loc", hex(node_loc))
         node = meta_index[node_loc]
         return simplify_node(node)
@@ -571,7 +576,7 @@ def simplify_if(meta_block_graph):
 
     return meta_block_graph
 
-def print_block(block):
+def print_block(block: LegacyBlock) -> bytes:
     prefix = b'/*' + bytes(hex(block['loc']), 'utf-8') + b'\n'
     suffix = b'\n*/\n'
 
@@ -581,7 +586,12 @@ def print_block(block):
 
     return prefix + body + suffix
 
-def print_if_cond(cond, conj, flags, block_index):
+def print_if_cond(
+    cond: list[int],
+    conj: list[bytes],
+    flags: list[bool],
+    block_index: LegacyBlockIndex,
+) -> tuple[bytes, bytes]:
 
     cond_out = b''
     cond_exprs = []
@@ -717,7 +727,7 @@ def print_if_cond(cond, conj, flags, block_index):
 
     return cond_out, cond_expr
 
-def generate_func_cf_from_graph(meta_block_graph):
+def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
     block_index = meta_block_graph['index']
     meta_index = meta_block_graph['meta_block_index']
     start = meta_block_graph['start_block']
@@ -726,7 +736,7 @@ def generate_func_cf_from_graph(meta_block_graph):
 
     start_node = meta_index[start]
 
-    def print_base_node(node):
+    def print_base_node(node: MetaBlock) -> tuple[int | None, bytes]:
         out = b''
         ty = node['type']
         if ty == 'if':
@@ -796,7 +806,7 @@ def generate_func_cf_from_graph(meta_block_graph):
             raise Exception
         return node_loc, out
 
-    def print_node(node):
+    def print_node(node: MetaBlock | None) -> bytes:
         out = b''
         while node is not None:
             ty = node['type']
@@ -829,14 +839,14 @@ def generate_func_cf_from_graph(meta_block_graph):
             node = meta_index[node_loc] if node_loc is not None else None
         return out
 
-    def print_node_loc(node_loc):
+    def print_node_loc(node_loc: int) -> bytes:
         # print("node_loc", hex(node_loc))
         node = meta_index[node_loc]
         return print_node(node)
 
     return print_node_loc(start)
 
-def generate_func_decl(block_graph):
+def generate_func_decl(block_graph: LegacyBlockGraph) -> bytes:
     start = block_graph['start_block']['loc']
 
 
@@ -878,7 +888,7 @@ def generate_func_decl(block_graph):
     return return_type + args_type
 
 # default to the RESET location on ARM M4
-def generate_func_cf_asm(binary, entry_point_loc=0x08020004):
+def generate_func_cf_asm(binary: bytes, entry_point_loc: int = 0x08020004) -> bytes:
     print('generate_func_cf_asm', hex(entry_point_loc))
 
     func_sigs = generate_func_sigs(binary, entry_point_loc)

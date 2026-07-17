@@ -5,7 +5,7 @@ from decomp.legacy_adapter import legacy_block_graph_to_cfg
 
 
 class CoreModelAdapterTests(unittest.TestCase):
-    def test_converts_legacy_block_graph_to_typed_cfg(self):
+    def test_converts_legacy_block_graph_to_typed_cfg(self) -> None:
         block = {
             "loc": 0x08020000,
             "end_loc": 0x08020004,
@@ -51,7 +51,7 @@ class CoreModelAdapterTests(unittest.TestCase):
         self.assertEqual(cfg.blocks[0x08020000].instructions[1].flow.kind, FlowKind.CONDITIONAL_BRANCH)
         self.assertEqual(cfg.blocks[0x08020004].incoming[0].source, 0x08020000)
 
-    def test_preserves_legacy_table_branch_targets(self):
+    def test_preserves_legacy_table_branch_targets(self) -> None:
         block = {
             "loc": 0x08020000,
             "end_loc": 0x08020002,

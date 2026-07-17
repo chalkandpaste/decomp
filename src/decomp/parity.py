@@ -289,7 +289,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def cmd_capture(args) -> None:
+def cmd_capture(args: argparse.Namespace) -> None:
     snapshot = capture_legacy_snapshot(
         args.binary,
         entry_point=parse_int(args.entry_point),
@@ -302,7 +302,7 @@ def cmd_capture(args) -> None:
     print(f"captured {len(snapshot.functions)} functions to {args.output}")
 
 
-def cmd_check(args) -> None:
+def cmd_check(args: argparse.Namespace) -> None:
     expected = read_snapshot(args.snapshot)
     actual = capture_legacy_snapshot(
         args.binary,
@@ -320,7 +320,7 @@ def cmd_check(args) -> None:
     print(f"parity ok for {args.snapshot}")
 
 
-def main(argv=None) -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
     args.func(args)

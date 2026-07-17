@@ -9,28 +9,28 @@ from decomp.instruction_buffer import InstructionsBuffer, is_probable_address_li
 
 
 class InstructionBufferLiteralTests(unittest.TestCase):
-    def make_buffer(self, value):
+    def make_buffer(self, value: int) -> InstructionsBuffer:
         buf = object.__new__(InstructionsBuffer)
         buf.binary_offset_loc = 0x08020000
         buf.binary = struct.pack("<I", value)
         return buf
 
-    def test_formats_flash_literals_as_addresses(self):
+    def test_formats_flash_literals_as_addresses(self) -> None:
         buf = self.make_buffer(0x08021000)
 
         self.assertEqual(buf.read_data_at_loc(0x08020000, 4), b"0x8021000")
 
-    def test_formats_sram_and_peripheral_literals_as_addresses(self):
+    def test_formats_sram_and_peripheral_literals_as_addresses(self) -> None:
         self.assertTrue(is_probable_address_literal(0x20000010))
         self.assertTrue(is_probable_address_literal(0x40021000))
         self.assertTrue(is_probable_address_literal(0xE000ED88))
 
-    def test_formats_plain_integers_as_decimal(self):
+    def test_formats_plain_integers_as_decimal(self) -> None:
         buf = self.make_buffer(1234)
 
         self.assertEqual(buf.read_data_at_loc(0x08020000, 4), b"1234")
 
-    def test_wrapper_exposes_typed_instruction_buffer(self):
+    def test_wrapper_exposes_typed_instruction_buffer(self) -> None:
         buf = object.__new__(InstructionsBuffer)
         buf.backend = ArmThumbBackend()
         buf.insns_buff = [
@@ -48,7 +48,7 @@ class InstructionBufferLiteralTests(unittest.TestCase):
 
 
 class ArmThumbBackendDecodeTests(unittest.TestCase):
-    def test_backend_reads_literals_with_current_address_formatting(self):
+    def test_backend_reads_literals_with_current_address_formatting(self) -> None:
         backend = ArmThumbBackend()
         binary = struct.pack("<I", 0x08021000)
 
@@ -57,7 +57,7 @@ class ArmThumbBackendDecodeTests(unittest.TestCase):
             b"0x8021000",
         )
 
-    def test_backend_decodes_legacy_tokens_to_typed_instruction(self):
+    def test_backend_decodes_legacy_tokens_to_typed_instruction(self) -> None:
         backend = ArmThumbBackend()
 
         instruction = backend.decode_legacy_tokens(
@@ -69,9 +69,9 @@ class ArmThumbBackendDecodeTests(unittest.TestCase):
         self.assertEqual(instruction.flow.kind, FlowKind.CONDITIONAL_BRANCH)
         self.assertEqual(instruction.flow.targets, (0x08020008,))
 
-    def test_backend_normalizes_branch_targets_against_decode_window(self):
+    def test_backend_normalizes_branch_targets_against_decode_window(self) -> None:
         class FakeBackend(ArmThumbBackend):
-            def disassemble_section(self, _section_bytes):
+            def disassemble_section(self, _section_bytes: bytes) -> bytes:
                 return b"0x2 2 0000 beq 0x8\n"
 
         backend = FakeBackend()
@@ -87,19 +87,19 @@ class ArmThumbBackendDecodeTests(unittest.TestCase):
 
 
 class ConvertInstructionTests(unittest.TestCase):
-    def test_three_operand_left_shift_lowers_as_left_shift(self):
+    def test_three_operand_left_shift_lowers_as_left_shift(self) -> None:
         self.assertEqual(
             convert_c.shift_left([b"lsls", b"r0", b"2"]),
             b"r0 = r0 << 2",
         )
 
-    def test_double_store_accepts_base_address_form(self):
+    def test_double_store_accepts_base_address_form(self) -> None:
         self.assertEqual(
             convert_c.store_d([b"strd", b"r0", b"r1", b"r2"]),
             b"*( r2) = r0;\n*( r2 + 4) = r1",
         )
 
-    def test_thumb_table_branch_mnemonics_are_bytes(self):
+    def test_thumb_table_branch_mnemonics_are_bytes(self) -> None:
         self.assertIn(b"tbh.w", instructions.tbb)
         self.assertNotIn("tbh.w", instructions.tbb)
 

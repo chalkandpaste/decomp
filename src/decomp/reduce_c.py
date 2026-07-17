@@ -4,6 +4,10 @@ import argparse
 import os
 import sys
 import tempfile
+from typing import Any, TypeAlias
+
+CNode: TypeAlias = Any
+Scope: TypeAlias = dict[str, CNode | None | bool]
 
 global while_killer
 global func_killer
@@ -119,7 +123,7 @@ init_scope = {
     # 'd11' : c_ast.ID('d10')
     # }
 
-def add_to_scope(scope, assign):
+def add_to_scope(scope: Scope, assign: CNode) -> tuple[CNode | None, str | None, Scope]:
     global var_counter
     name = assign.lvalue.name
     val = assign.rvalue
@@ -138,7 +142,7 @@ def add_to_scope(scope, assign):
     else:
         return None, None, scope
 
-def update_scope(scope, new_scopes):
+def update_scope(scope: Scope, new_scopes: list[Scope]) -> Scope:
     for ns in new_scopes:
         for k in scope:
             if scope[k] is not ns[k]:
@@ -146,9 +150,9 @@ def update_scope(scope, new_scopes):
     
     return scope
 
-def expr_depth(ex, limit = 3):
+def expr_depth(ex: CNode, limit: int = 3) -> bool:
     
-    def e_dep(e, d, l):
+    def e_dep(e: CNode, d: int, l: int) -> int:
         if d < l:
             if isinstance(e, c_ast.BinaryOp):
                 return e_dep(e.left, d + 1, l) + e_dep(e.right, d + 1, l)
@@ -172,7 +176,7 @@ def expr_depth(ex, limit = 3):
 
     return e_dep(ex, 0, limit) >= limit
 
-def reduce_expr(e, scope):
+def reduce_expr(e: CNode, scope: Scope) -> CNode:
 
     if isinstance(e, c_ast.BinaryOp):
         e.left = reduce_expr(e.left, scope)
@@ -231,7 +235,7 @@ def reduce_expr(e, scope):
     # return e
 
 
-def reduce_if (i, scope):
+def reduce_if(i: CNode, scope: Scope) -> tuple[CNode, Scope]:
     i.cond = reduce_expr(i.cond, scope)
 
     if i.iftrue:
@@ -260,7 +264,7 @@ def reduce_if (i, scope):
     scope = update_scope(scope, [true_scope, false_scope])
     return i, scope
 
-def merge_while_scope(scope, w_scope):
+def merge_while_scope(scope: Scope, w_scope: Scope) -> Scope:
     for k in w_scope:
         if w_scope[k] is not None:
             w_scope[k] = True # get rid of it
@@ -273,7 +277,7 @@ def merge_while_scope(scope, w_scope):
    
     return scope
 
-def reduce_while (w, scope):
+def reduce_while(w: CNode, scope: Scope) -> tuple[CNode, Scope]:
     # print('reduce_while')
 
     global while_killer
@@ -295,7 +299,7 @@ def reduce_while (w, scope):
    
     return w, scope
 
-def reduce_switch (s, scope):
+def reduce_switch(s: CNode, scope: Scope) -> tuple[CNode, Scope]:
 
     s.cond = reduce_expr(s.cond, scope)
 
@@ -316,7 +320,7 @@ def reduce_switch (s, scope):
 
     return s, scope
 
-def reduce_func (f, scope):
+def reduce_func(f: CNode, scope: Scope) -> CNode:
     # global debug_counter
 
     # func_count = 39
@@ -340,7 +344,7 @@ def reduce_func (f, scope):
 
     return f
 
-def reduce_body (body, scope):
+def reduce_body(body: list[CNode] | None, scope: Scope) -> tuple[list[CNode] | None, Scope]:
 
     if body is None:
         return body, scope
@@ -422,7 +426,7 @@ def reduce_body (body, scope):
 
     return new_block_items, scope 
 
-def reduce_c(raw, fk = False, wk = False):
+def reduce_c(raw: bytes, fk: bool = False, wk: bool = False) -> bytes:
     global func_killer
     func_killer = fk
     global while_killer

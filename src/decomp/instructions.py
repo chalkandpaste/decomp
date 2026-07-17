@@ -1,5 +1,5 @@
 
-def crs(reg_string): # clean reg string
+def crs(reg_string: bytes) -> bytes: # clean reg string
     reg_string_clean = reg_string.lstrip(b'[').rstrip(b'],')
     return reg_string_clean 
 
@@ -102,4 +102,3 @@ coprocessor = [ b'stc2l', b'ldc2l' ]
 moves = [ b'mov', b'movw', b'movs', b'movs.w',  b'vmov.f32', b'mov.w', b'vmov', b'vmrs'] 
 n_moves = [ b'mvn', b'mvn.w', b'mvns' ]
 move = moves + n_moves
-

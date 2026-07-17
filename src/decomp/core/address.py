@@ -11,7 +11,7 @@ class AddressRange:
     start: Address
     end: Address
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.end < self.start:
             raise ValueError("address range end must be greater than or equal to start")
 

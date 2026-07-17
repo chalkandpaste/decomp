@@ -1,13 +1,16 @@
+from .legacy_types import LegacyBlockIndex
+
+
 class LoopTracker:
 
-    def __init__(self, block_index):
+    def __init__(self, block_index: LegacyBlockIndex) -> None:
         self.block_index = block_index
         self.loc_to_loop_end = {}
         self.loc_to_loop_start = {}
         self.loc_to_loop_locs = {}
         self.not_loop_loc = {} # locs which are not in a loop
 
-    def is_loop_start(self, loc):
+    def is_loop_start(self, loc: int) -> bool | None:
         # print('is_loop_start', hex(loc))
         if loc in self.loc_to_loop_start:
             return loc == self.loc_to_loop_start[loc]
@@ -18,7 +21,7 @@ class LoopTracker:
             if loc in self.loc_to_loop_start:
                 return loc == self.loc_to_loop_start[loc]
     
-    def get_loop_start(self, loc):
+    def get_loop_start(self, loc: int) -> int | None:
         if loc in self.loc_to_loop_start:
             return self.loc_to_loop_start[loc]
         elif loc not in self.not_loop_loc:
@@ -30,7 +33,7 @@ class LoopTracker:
             else:
                 return None
     
-    def is_loop_end(self, loc):
+    def is_loop_end(self, loc: int) -> bool | None:
         # print('is_loop_end', hex(loc))
         if loc in self.loc_to_loop_end:
             return loc == self.loc_to_loop_end[loc]
@@ -41,7 +44,7 @@ class LoopTracker:
             if loc in self.loc_to_loop_end:
                 return loc == self.loc_to_loop_end[loc]
     
-    def get_loop_end(self, loc):
+    def get_loop_end(self, loc: int) -> int | None:
         if loc in self.loc_to_loop_end:
             return self.loc_to_loop_end[loc]
         elif loc not in self.not_loop_loc:
@@ -53,7 +56,7 @@ class LoopTracker:
             else:
                 return None
 
-    def can_loop(self, loc):
+    def can_loop(self, loc: int) -> bool:
         # print('can_loop', hex(loc))
         if loc in self.loc_to_loop_start:
             # print('in start')
@@ -64,7 +67,7 @@ class LoopTracker:
         else:
             return self.detect_loop(loc)
 
-    def branch_intersects(self, reachable, loc):
+    def branch_intersects(self, reachable: list[int] | set[int], loc: int) -> bool:
         # print('branch_intersects', [hex(r) for r in reachable], hex(loc))
 
         search_locs = [loc]
@@ -108,7 +111,7 @@ class LoopTracker:
 
         return False
     
-    def detect_loop(self, start_loc):
+    def detect_loop(self, start_loc: int) -> bool:
         # print('detect_loop', hex(start_loc))
         # we want to first detect all the points in the loop, do this by making a loop path
         # asserting if it is maximal and then expanding if not maximal.
@@ -138,7 +141,9 @@ class LoopTracker:
 
         return True
     
-    def _check_loop(self, start_loc, dont_follow = []):
+    def _check_loop(self, start_loc: int, dont_follow: list[int] | None = None) -> bool:
+        if dont_follow is None:
+            dont_follow = []
         print('_check_loop', hex(start_loc), [hex(df) for df in dont_follow])
         seen = {}
         search_locs = [start_loc]
@@ -160,7 +165,13 @@ class LoopTracker:
 
         return False
 
-    def _detect_loop_inner(self, search_locs, dont_follow = []):
+    def _detect_loop_inner(
+        self,
+        search_locs: list[int],
+        dont_follow: list[int] | None = None,
+    ) -> tuple[list[int], int | None, int | None]:
+        if dont_follow is None:
+            dont_follow = []
         print('_detect_loop_inner', [hex(l) for l in search_locs], [hex(df) for df in dont_follow])
         seen = {}
         loop_locs = []

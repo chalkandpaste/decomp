@@ -15,7 +15,7 @@ from decomp.parity import (
 
 
 class ParitySnapshotTests(unittest.TestCase):
-    def make_snapshot(self, *, calls=(0x08020010,)):
+    def make_snapshot(self, *, calls: tuple[int, ...] = (0x08020010,)) -> ParitySnapshot:
         return ParitySnapshot(
             architecture="arm-thumb",
             base_address=0x08020000,
@@ -42,7 +42,7 @@ class ParitySnapshotTests(unittest.TestCase):
             ),
         )
 
-    def test_round_trips_snapshot_json(self):
+    def test_round_trips_snapshot_json(self) -> None:
         snapshot = self.make_snapshot()
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "snapshot.json"
@@ -52,7 +52,7 @@ class ParitySnapshotTests(unittest.TestCase):
 
         self.assertEqual(restored, snapshot)
 
-    def test_compare_reports_structural_drift(self):
+    def test_compare_reports_structural_drift(self) -> None:
         expected = self.make_snapshot()
         actual = self.make_snapshot(calls=(0x08020020,))
 
@@ -60,7 +60,7 @@ class ParitySnapshotTests(unittest.TestCase):
 
         self.assertTrue(any("0x80202cc.calls" in difference for difference in differences))
 
-    def test_dd2_binary_matches_checked_in_parity_fixture_if_available(self):
+    def test_dd2_binary_matches_checked_in_parity_fixture_if_available(self) -> None:
         binary_path = Path("/Volumes/Locker/Synth/DD2.1.0.bin")
         if not binary_path.exists():
             self.skipTest("DD2.1.0.bin is not available on this machine")

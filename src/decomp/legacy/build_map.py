@@ -1,6 +1,12 @@
 import pickle
+from collections.abc import BinaryIO
+from typing import Any
 
-def input_seq (instruction, matches):
+LegacyMap = dict[bytes, list[str]]
+LegacySection = dict[str, Any]
+
+
+def input_seq(instruction: list[bytes], matches: list[str]) -> str | None:
     print(matches)
     print(instruction)
     if len(matches) == 0:
@@ -10,7 +16,7 @@ def input_seq (instruction, matches):
         return addition
 
 
-def build_map_section (comments, m):
+def build_map_section(comments: LegacySection, m: LegacyMap) -> LegacyMap:
     for line in comments['section']:
         if line.lstrip().startswith(b'/*'):
             pass
@@ -34,7 +40,7 @@ def build_map_section (comments, m):
 
     return m
 
-def build_map (sections, m):
+def build_map(sections: list[LegacySection], m: LegacyMap) -> LegacyMap:
     print(m)
     try: 
         for section in sections:
@@ -64,7 +70,7 @@ def build_map (sections, m):
 
     return m
 
-def preprocess_file(f):
+def preprocess_file(f: BinaryIO) -> list[LegacySection]:
     sections = []
 
     comment_switch = False
@@ -101,4 +107,3 @@ if __name__ == "__main__":
     g = open('test.map', 'wb')
     g.write(pickle.dumps(m))
     g.close()
-

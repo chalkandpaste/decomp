@@ -1,6 +1,7 @@
 from .block_graph import generate_block_graph, recurse_graph
 from .analysis import collect_function_addresses
 from .legacy_adapter import legacy_block_graph_to_cfg
+from .legacy_types import LegacyBlockGraph, LegacyRegisterScope
 
 from .loop_tracker import LoopTracker
 from .instructions import *
@@ -15,7 +16,7 @@ skip_functions = [ 134469972, 134471256, 134469472, 134471424, 134472782, 134455
             # 0x803c29c, 0x803adc8, 0x803d7dc, 0x803af48, 0x803af28, 0x8020688, 0x803c222, 0x803d440, 0x803aec0,
             # 0x8020244, 0x803af68, 0x8030144, 0x802ff6c, 0x802fd58, 0x803c23c,  ]
 
-def add_function_sigs(block_graph, function_sigs):
+def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, bytes]) -> LegacyBlockGraph:
 
     block_index = block_graph['index']
     start_block = block_graph['start_block']
@@ -53,11 +54,11 @@ def add_function_sigs(block_graph, function_sigs):
 
     return block_graph
 
-def collect_functions(block_graph):
+def collect_functions(block_graph: LegacyBlockGraph) -> list[int]:
     cfg = legacy_block_graph_to_cfg(block_graph)
     return collect_function_addresses(cfg)
 
-def get_function_signature(block_graph):
+def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegisterScope, LegacyRegisterScope]:
     start_block = block_graph['start_block']
     block_index = block_graph['index']
     print('get_function_signature', hex(start_block['loc']))
@@ -529,7 +530,7 @@ def get_function_signature(block_graph):
 
     return return_scope, arg_scope
 
-def generate_set_of_funcs(binary, entry_point_loc):
+def generate_set_of_funcs(binary: bytes, entry_point_loc: int) -> list[int]:
     search_locs = [entry_point_loc]
     seen = {}
 
@@ -548,7 +549,7 @@ def generate_set_of_funcs(binary, entry_point_loc):
     return list(set(functions))
 
 
-def generate_func_sigs(binary, entry_point_loc):
+def generate_func_sigs(binary: bytes, entry_point_loc: int) -> bytes:
 
     search_locs = [entry_point_loc]
     func_call_graph = {}

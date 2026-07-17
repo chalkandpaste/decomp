@@ -2,6 +2,10 @@ from pycparser import parse_file, c_generator, c_ast, c_parser
 import argparse
 import os
 import tempfile
+from typing import Any, TypeAlias
+
+CNode: TypeAlias = Any
+LivenessScope: TypeAlias = dict[str, bool]
 
 parser = c_parser.CParser()
 
@@ -66,9 +70,9 @@ init_liveness = {
 
 
 
-def expr_depth(ex, limit = 3):
+def expr_depth(ex: CNode, limit: int = 3) -> bool:
     
-    def e_dep(e, d, l):
+    def e_dep(e: CNode, d: int, l: int) -> int | float:
         if d < l:
             if isinstance(e, c_ast.BinaryOp):
                 return e_dep(e.left, d + 1, l) + e_dep(e.right, d + 1, l)
@@ -92,7 +96,7 @@ def expr_depth(ex, limit = 3):
 
     return e_dep(ex, 0, limit) >= limit
 
-def liveness_expr(e, liveness):
+def liveness_expr(e: CNode, liveness: LivenessScope) -> LivenessScope:
 
     if isinstance(e, c_ast.BinaryOp):
         liveness = liveness_expr(e.left, liveness)
@@ -118,7 +122,7 @@ def liveness_expr(e, liveness):
 
     return liveness
 
-def liveness_if (i, liveness):
+def liveness_if(i: CNode, liveness: LivenessScope) -> tuple[CNode, LivenessScope]:
 
     if i.iffalse and i.iffalse.block_items:
         i.iffalse.block_items, false_liveness = liveness_body(i.iffalse.block_items, liveness.copy())
@@ -139,13 +143,13 @@ def liveness_if (i, liveness):
     
     return i, liveness
 
-def liveness_while (w, liveness):
+def liveness_while(w: CNode, liveness: LivenessScope) -> tuple[CNode, LivenessScope]:
 
     w.stmt.block_items, liveness = liveness_body(w.stmt.block_items, liveness.copy())
 
     return w, liveness
 
-def liveness_switch (s, liveness):
+def liveness_switch(s: CNode, liveness: LivenessScope) -> tuple[CNode, LivenessScope]:
 
     s.stmt.block_items, liveness = liveness_body(s.stmt.block_items, liveness.copy())
 
@@ -153,14 +157,14 @@ def liveness_switch (s, liveness):
 
     return s, liveness
 
-def liveness_func (f, liveness):
+def liveness_func(f: CNode, liveness: LivenessScope) -> LivenessScope:
     if f.args:
         for e in f.args.exprs:
             liveness = liveness_expr(e, liveness.copy())
 
     return liveness
 
-def liveness_body (body, liveness):
+def liveness_body(body: list[CNode] | None, liveness: LivenessScope) -> tuple[list[CNode] | None, LivenessScope]:
    
     if body is None:
         return body, liveness
@@ -241,7 +245,7 @@ def liveness_body (body, liveness):
 
     return new_block_items, liveness 
 
-def liveness(raw):
+def liveness(raw: bytes) -> bytes:
     with tempfile.NamedTemporaryFile(suffix='.c', delete=False) as f:
         f.write(raw)
         temp_path = f.name

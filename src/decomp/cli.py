@@ -1,7 +1,8 @@
 import argparse
 from pathlib import Path
+from collections.abc import Sequence
 
-def main():
+def main(argv: Sequence[str] | None = None) -> None:
 
     parser = argparse.ArgumentParser(
         prog='decomp',
@@ -22,7 +23,7 @@ def main():
         help='limit recursive discovery/output to the first N functions',
     )
     
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     from .block_graph import generate_block_graph, generate_asm
     from .convert_c import convert

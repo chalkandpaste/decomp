@@ -10,7 +10,7 @@ from decomp.function_signatures import collect_functions
 
 
 class CollectFunctionsTests(unittest.TestCase):
-    def test_collects_literal_loaded_indirect_calls(self):
+    def test_collects_literal_loaded_indirect_calls(self) -> None:
         block = {
             "loc": 0x080202CC,
             "children": [],
@@ -28,7 +28,7 @@ class CollectFunctionsTests(unittest.TestCase):
             [0x08020188, 0x08034F48],
         )
 
-    def test_collects_lower_address_unconditional_tail_branch(self):
+    def test_collects_lower_address_unconditional_tail_branch(self) -> None:
         block = {
             "loc": 0x08034F48,
             "children": [0x0803228C],
@@ -48,7 +48,7 @@ class CollectFunctionsTests(unittest.TestCase):
 
         self.assertEqual(collect_functions(graph), [0x0803228C])
 
-    def test_typed_xrefs_collect_direct_calls(self):
+    def test_typed_xrefs_collect_direct_calls(self) -> None:
         insns = [
             [b"0x8020000", b"4", b"00000000", b"bl", b"0x8030001"],
             [b"0x8020004", b"2", b"0000", b"bx", b"lr"],
@@ -61,7 +61,7 @@ class CollectFunctionsTests(unittest.TestCase):
         self.assertEqual(references[0].target, 0x08030000)
         self.assertEqual(references[0].kind, CallReferenceKind.DIRECT_CALL)
 
-    def test_typed_xrefs_collect_indirect_literal_calls(self):
+    def test_typed_xrefs_collect_indirect_literal_calls(self) -> None:
         insns = [
             [b"0x8020000", b"2", b"0000", b"mov", b"r0,", b"0x8034f49"],
             [b"0x8020002", b"2", b"0000", b"blx", b"r0"],
@@ -75,7 +75,7 @@ class CollectFunctionsTests(unittest.TestCase):
         self.assertEqual(references[0].target, 0x08034F48)
         self.assertEqual(references[0].kind, CallReferenceKind.INDIRECT_LITERAL_CALL)
 
-    def test_typed_xrefs_collect_lower_tail_branch_from_entry_block(self):
+    def test_typed_xrefs_collect_lower_tail_branch_from_entry_block(self) -> None:
         insns = [
             [b"0x8034f80", b"4", b"00000000", b"b.w", b"0x803228c"],
             [b"0x803228c", b"2", b"0000", b"bx", b"lr"],
@@ -88,7 +88,7 @@ class CollectFunctionsTests(unittest.TestCase):
         self.assertEqual(references[0].target, 0x0803228C)
         self.assertEqual(references[0].kind, CallReferenceKind.LOWER_TAIL_BRANCH)
 
-    def test_typed_xrefs_collect_tail_branch_after_restore(self):
+    def test_typed_xrefs_collect_tail_branch_after_restore(self) -> None:
         block = {
             "loc": 0x08034F48,
             "children": [],

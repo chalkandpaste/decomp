@@ -1,4 +1,5 @@
 import argparse
+from collections.abc import Sequence
 
 from .architectures import list_architectures
 from .project_state import (
@@ -12,7 +13,7 @@ from .project_state import (
 )
 
 
-def cmd_init(args):
+def cmd_init(args: argparse.Namespace) -> None:
     conn = initialize(
         args.project,
         binary_path=args.binary,
@@ -24,26 +25,26 @@ def cmd_init(args):
     print(f"initialized {args.project}")
 
 
-def cmd_arches(_args):
+def cmd_arches(_args: argparse.Namespace) -> None:
     for arch in list_architectures():
         print(f"{arch.id}\t{arch.status}\t{arch.display_name}")
 
 
-def cmd_rename(args):
+def cmd_rename(args: argparse.Namespace) -> None:
     conn = connect(args.project)
     rename_function(conn, args.address, args.name, confidence=args.confidence)
     conn.close()
     print(f"renamed {args.address} -> {args.name}")
 
 
-def cmd_note(args):
+def cmd_note(args: argparse.Namespace) -> None:
     conn = connect(args.project)
     add_note(conn, args.address, args.note)
     conn.close()
     print(f"noted {args.address}")
 
 
-def cmd_suggest(args):
+def cmd_suggest(args: argparse.Namespace) -> None:
     conn = connect(args.project)
     suggestion_id = add_ai_suggestion(
         conn,
@@ -57,7 +58,7 @@ def cmd_suggest(args):
     print(f"suggestion {suggestion_id} recorded for {args.address}")
 
 
-def cmd_list(args):
+def cmd_list(args: argparse.Namespace) -> None:
     conn = connect(args.project)
     for row in list_functions(conn):
         addr = hex(row["address"])
@@ -68,14 +69,14 @@ def cmd_list(args):
     conn.close()
 
 
-def cmd_export_names(args):
+def cmd_export_names(args: argparse.Namespace) -> None:
     conn = connect(args.project)
     export_names(conn, args.output)
     conn.close()
     print(f"exported names to {args.output}")
 
 
-def build_parser():
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="decomp-project",
         description="manage decompiler project state",
@@ -127,7 +128,7 @@ def build_parser():
     return parser
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
     args.func(args)

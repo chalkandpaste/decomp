@@ -2,6 +2,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from .architectures import get_architecture
 
@@ -9,21 +10,21 @@ from .architectures import get_architecture
 SCHEMA_VERSION = 1
 
 
-def utc_now():
+def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def parse_address(value):
+def parse_address(value: int | str) -> int:
     if isinstance(value, int):
         return value
     return int(value, 0)
 
 
-def format_address(value):
+def format_address(value: int) -> str:
     return hex(value)
 
 
-def connect(db_path):
+def connect(db_path: str | Path) -> sqlite3.Connection:
     path = Path(db_path)
     if path.parent != Path("."):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -32,7 +33,14 @@ def connect(db_path):
     return conn
 
 
-def initialize(db_path, *, binary_path=None, architecture="arm-thumb", base_address=None, entry_point=None):
+def initialize(
+    db_path: str | Path,
+    *,
+    binary_path: str | Path | None = None,
+    architecture: str = "arm-thumb",
+    base_address: int | str | None = None,
+    entry_point: int | str | None = None,
+) -> sqlite3.Connection:
     get_architecture(architecture)
     conn = connect(db_path)
     with conn:
@@ -93,7 +101,7 @@ def initialize(db_path, *, binary_path=None, architecture="arm-thumb", base_addr
     return conn
 
 
-def set_metadata(conn, key, value):
+def set_metadata(conn: sqlite3.Connection, key: str, value: str) -> None:
     conn.execute(
         """
         INSERT INTO metadata (key, value)
@@ -104,12 +112,21 @@ def set_metadata(conn, key, value):
     )
 
 
-def get_metadata(conn):
+def get_metadata(conn: sqlite3.Connection) -> dict[str, str]:
     rows = conn.execute("SELECT key, value FROM metadata ORDER BY key").fetchall()
     return {row["key"]: row["value"] for row in rows}
 
 
-def upsert_function(conn, address, *, name=None, status=None, signature=None, summary=None, confidence=None):
+def upsert_function(
+    conn: sqlite3.Connection,
+    address: int | str,
+    *,
+    name: str | None = None,
+    status: str | None = None,
+    signature: str | None = None,
+    summary: str | None = None,
+    confidence: float | None = None,
+) -> None:
     address = parse_address(address)
     now = utc_now()
     existing = conn.execute(
@@ -147,7 +164,13 @@ def upsert_function(conn, address, *, name=None, status=None, signature=None, su
     )
 
 
-def rename_function(conn, address, name, *, confidence=None):
+def rename_function(
+    conn: sqlite3.Connection,
+    address: int | str,
+    name: str,
+    *,
+    confidence: float | None = None,
+) -> None:
     with conn:
         upsert_function(
             conn,
@@ -158,7 +181,7 @@ def rename_function(conn, address, name, *, confidence=None):
         )
 
 
-def add_note(conn, address, note):
+def add_note(conn: sqlite3.Connection, address: int | str, note: str) -> None:
     address = parse_address(address)
     now = utc_now()
     with conn:
@@ -169,7 +192,15 @@ def add_note(conn, address, note):
         )
 
 
-def add_ai_suggestion(conn, address, kind, suggestion, *, rationale=None, confidence=None):
+def add_ai_suggestion(
+    conn: sqlite3.Connection,
+    address: int | str,
+    kind: str,
+    suggestion: str,
+    *,
+    rationale: str | None = None,
+    confidence: float | None = None,
+) -> int:
     address = parse_address(address)
     now = utc_now()
     with conn:
@@ -185,7 +216,7 @@ def add_ai_suggestion(conn, address, kind, suggestion, *, rationale=None, confid
     return cursor.lastrowid
 
 
-def set_suggestion_status(conn, suggestion_id, status):
+def set_suggestion_status(conn: sqlite3.Connection, suggestion_id: int, status: str) -> None:
     if status not in {"pending", "accepted", "rejected"}:
         raise ValueError("suggestion status must be pending, accepted, or rejected")
     with conn:
@@ -195,7 +226,7 @@ def set_suggestion_status(conn, suggestion_id, status):
         )
 
 
-def list_functions(conn):
+def list_functions(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     rows = conn.execute(
         """
         SELECT address, name, status, signature, summary, confidence
@@ -206,7 +237,7 @@ def list_functions(conn):
     return [dict(row) for row in rows]
 
 
-def export_names(conn, output_path):
+def export_names(conn: sqlite3.Connection, output_path: str | Path) -> dict[str, Any]:
     payload = {
         "metadata": get_metadata(conn),
         "functions": [
