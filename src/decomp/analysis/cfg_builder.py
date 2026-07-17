@@ -17,6 +17,7 @@ from decomp.instructions import (
     tbb,
     uncond_block_end,
 )
+from decomp.legacy_types import LegacyBlock, LegacyBlockGraph, LegacyBlockIndex, LegacyInstruction
 
 
 class InstructionSource(Protocol):
@@ -39,7 +40,7 @@ class InstructionsBufferSource:
 
 
 class LegacyTokenInstructionSource:
-    def __init__(self, legacy_tokens: list[list[object]], backend: ArmThumbBackend | None = None) -> None:
+    def __init__(self, legacy_tokens: list[LegacyInstruction], backend: ArmThumbBackend | None = None) -> None:
         self.legacy_tokens = legacy_tokens
         self.backend = backend or ArmThumbBackend()
         self.instructions = tuple(
@@ -84,24 +85,21 @@ def build_control_flow_graph(source: InstructionSource, entry_point: int) -> Con
     return ControlFlowGraph(entry=entry_point, blocks=blocks)
 
 
-def cfg_to_legacy_block_graph(cfg: ControlFlowGraph) -> dict[str, object]:
+def cfg_to_legacy_block_graph(cfg: ControlFlowGraph) -> LegacyBlockGraph:
     parents = _legacy_parent_index(cfg.entry, cfg.blocks)
-    index = {}
+    index: LegacyBlockIndex = {}
 
     for address, block in cfg.blocks.items():
-        index[address] = {
-            "loc": block.address,
-            "end_loc": block.end,
-            "block": [_legacy_tokens(instruction) for instruction in block.instructions],
-            "children": [edge.target for edge in block.outgoing],
-            "parents": parents.get(address, []),
-            "depth": block.depth,
-        }
+        index[address] = LegacyBlock(
+            loc=block.address,
+            end_loc=block.end,
+            block=[_legacy_tokens(instruction) for instruction in block.instructions],
+            children=[edge.target for edge in block.outgoing],
+            parents=parents.get(address, []),
+            depth=block.depth,
+        )
 
-    return {
-        "index": index,
-        "start_block": index[cfg.entry],
-    }
+    return LegacyBlockGraph(index=index, start_block=index[cfg.entry])
 
 
 def _read_block(source: InstructionSource, address: int) -> tuple[BasicBlock, list[int]]:
@@ -277,7 +275,7 @@ def _edge_kind_for_child(index: int, child_count: int) -> EdgeKind:
     return EdgeKind.UNKNOWN
 
 
-def _legacy_tokens(instruction: Instruction) -> list[object]:
+def _legacy_tokens(instruction: Instruction) -> LegacyInstruction:
     if instruction.legacy_tokens:
         return list(instruction.legacy_tokens)
     return list(instruction.raw_tokens)
@@ -287,9 +285,9 @@ def _mnemonic(instruction: Instruction) -> bytes:
     return instruction.mnemonic.encode("ascii")
 
 
-def _contains_pc_return(tokens: list[object]) -> bool:
+def _contains_pc_return(tokens: LegacyInstruction) -> bool:
     return b"pc," in tokens[5:] or b"pc}" in tokens[4:] or b"{pc}" in tokens[4:]
 
 
-def _contains_lr_restore(tokens: list[object]) -> bool:
+def _contains_lr_restore(tokens: LegacyInstruction) -> bool:
     return b"lr," in tokens[5:] or b"lr}" in tokens[4:]

@@ -39,7 +39,7 @@ def legacy_block_graph_to_cfg(block_graph: LegacyBlockGraph, backend: ArmThumbBa
             instructions=instructions,
             outgoing=tuple(outgoing.get(address, ())),
             incoming=tuple(incoming.get(address, ())),
-            depth=block.get("depth", 0),
+            depth=block.depth,
         )
 
     return ControlFlowGraph(entry=start, blocks=blocks)

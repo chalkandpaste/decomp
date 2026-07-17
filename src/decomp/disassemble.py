@@ -1,5 +1,5 @@
 import argparse
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
 from .loop_tracker import LoopTracker
 from .instructions import *
@@ -7,8 +7,8 @@ from .function_signatures import generate_func_sigs, add_function_sigs, get_func
 from .block_graph import generate_block_graph, print_block_graph
 from .legacy_types import LegacyBlock, LegacyBlockGraph, LegacyBlockIndex
 
-MetaBlock: TypeAlias = dict[str, Any]
-MetaBlockGraph: TypeAlias = dict[str, Any]
+MetaBlock: TypeAlias = dict[str, object]
+MetaBlockGraph: TypeAlias = dict[str, object]
 
 
 # type if_meta_block -- block to contain if (triangle control flow)

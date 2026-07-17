@@ -42,15 +42,13 @@ def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, by
                     insn.append(fs)
 
             new_insns.append(insn)
-        block_index[loc]['block'] = new_insns
+        block_index[loc].block[:] = new_insns
 
         c_locs = block_index[loc]['children']
 
         for c in c_locs:
             if c not in seen and c not in search_locs:
                 search_locs.append(c)
-
-    block_graph['index'] = block_index
 
     return block_graph
 

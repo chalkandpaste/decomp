@@ -17,9 +17,8 @@ from .legacy_types import (
 import pickle
 import os.path
 import argparse
-from typing import Any
 
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 
 # type block_graph
 # {
@@ -94,16 +93,16 @@ def mk_block(
         children = []
     if parents is None:
         parents = []
-    return {
-            'loc'        : loc,
-            'end_loc'    : end_loc,
-            'block'      : block,
-            'children'   : children,
-            'parents'    : parents,
-            'depth'      : 0
-            }
+    return LegacyBlock(
+            loc=loc,
+            end_loc=end_loc,
+            block=block,
+            children=children,
+            parents=parents,
+            depth=0,
+            )
 
-def recurse_graph(block_graph: LegacyBlockGraph, f: LegacyTraversalFn, base_case: Any, direction: bool) -> Any:
+def recurse_graph(block_graph: LegacyBlockGraph, f: LegacyTraversalFn, base_case: object, direction: bool) -> object:
     start_block = block_graph['start_block']
     block_index = block_graph['index']
     return recurse_blocks(start_block, block_index, f, base_case, direction)
@@ -112,9 +111,9 @@ def recurse_blocks(
     block: LegacyBlock,
     block_index: LegacyBlockIndex,
     f: LegacyTraversalFn,
-    base_case: Any,
+    base_case: object,
     direction: bool,
-) -> Any:
+) -> object:
 
     out = base_case
 

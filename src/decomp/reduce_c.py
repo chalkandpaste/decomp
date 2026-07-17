@@ -4,9 +4,9 @@ import argparse
 import os
 import sys
 import tempfile
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
-CNode: TypeAlias = Any
+CNode: TypeAlias = c_ast.Node | None
 Scope: TypeAlias = dict[str, CNode | None | bool]
 
 global while_killer

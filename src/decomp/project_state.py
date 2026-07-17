@@ -2,7 +2,6 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from .architectures import get_architecture
 
@@ -226,7 +225,7 @@ def set_suggestion_status(conn: sqlite3.Connection, suggestion_id: int, status: 
         )
 
 
-def list_functions(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+def list_functions(conn: sqlite3.Connection) -> list[dict[str, object]]:
     rows = conn.execute(
         """
         SELECT address, name, status, signature, summary, confidence
@@ -237,7 +236,7 @@ def list_functions(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
-def export_names(conn: sqlite3.Connection, output_path: str | Path) -> dict[str, Any]:
+def export_names(conn: sqlite3.Connection, output_path: str | Path) -> dict[str, object]:
     payload = {
         "metadata": get_metadata(conn),
         "functions": [

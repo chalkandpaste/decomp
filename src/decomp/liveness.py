@@ -2,9 +2,9 @@ from pycparser import parse_file, c_generator, c_ast, c_parser
 import argparse
 import os
 import tempfile
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
-CNode: TypeAlias = Any
+CNode: TypeAlias = c_ast.Node | None
 LivenessScope: TypeAlias = dict[str, bool]
 
 parser = c_parser.CParser()

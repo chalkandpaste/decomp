@@ -1,9 +1,10 @@
 import pickle
 from collections.abc import BinaryIO
-from typing import Any
+
+from decomp.legacy_types import LegacyLineSection
 
 LegacyMap = dict[bytes, list[str]]
-LegacySection = dict[str, Any]
+LegacySection = LegacyLineSection
 
 
 def input_seq(instruction: list[bytes], matches: list[str]) -> str | None:
@@ -79,13 +80,13 @@ def preprocess_file(f: BinaryIO) -> list[LegacySection]:
     for line in f:
         stripped = line.lstrip()
         if stripped.startswith(b'/*'):
-            sections.append({'type' : comment_switch, 'section': section})
+            sections.append(LegacyLineSection(type=comment_switch, section=section))
             section = []
             section.append(line)
             comment_switch = True
         elif stripped.startswith(b'*/'):
             section.append(line)
-            sections.append({'type' : comment_switch, 'section': section})
+            sections.append(LegacyLineSection(type=comment_switch, section=section))
             section = []
             comment_switch = False
         else:
