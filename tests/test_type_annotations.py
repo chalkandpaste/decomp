@@ -257,6 +257,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_loop_tracker_boundary_predicates_return_bool(self) -> None:
+        self.assertEqual(
+            _function_return_annotation_violations(
+                Path("src/decomp/loop_tracker.py"),
+                {"is_loop_end", "is_loop_start"},
+                "bool",
+            ),
+            [],
+        )
+
     def test_add_function_sigs_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _exact_import_violations(
@@ -1162,6 +1172,22 @@ def _statements_after_return(path: Path, statements: list[ast.stmt], function_na
         elif isinstance(statement, ast.If):
             violations.extend(_statements_after_return(path, statement.body, function_name))
             violations.extend(_statements_after_return(path, statement.orelse, function_name))
+    return violations
+
+
+def _function_return_annotation_violations(
+    path: Path,
+    function_names: set[str],
+    expected_annotation: str,
+) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name not in function_names:
+            continue
+        actual = ast.unparse(node.returns) if node.returns is not None else None
+        if actual != expected_annotation:
+            violations.append(f"{path}:{node.lineno} {node.name} should return {expected_annotation}")
     return violations
 
 

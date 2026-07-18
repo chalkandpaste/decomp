@@ -41,6 +41,8 @@ class LoopTrackerTests(unittest.TestCase):
         )
         self.assertIsNone(tracker.get_loop_start(first.address))
         self.assertIsNone(tracker.get_loop_end(first.address))
+        self.assertFalse(tracker.is_loop_start(first.address))
+        self.assertFalse(tracker.is_loop_end(first.address))
 
     def test_loop_tracker_exposes_cached_loop_boundaries_for_structured_loop(self) -> None:
         entry = _legacy_block(0x08020000, (0x08020002,), ())
@@ -65,6 +67,10 @@ class LoopTrackerTests(unittest.TestCase):
         self.assertEqual(tracker.get_loop_start(loop_end.address), loop_start.address)
         self.assertEqual(tracker.get_loop_end(loop_start.address), loop_end.address)
         self.assertEqual(tracker.get_loop_end(loop_end.address), loop_end.address)
+        self.assertTrue(tracker.is_loop_start(loop_start.address))
+        self.assertFalse(tracker.is_loop_start(loop_end.address))
+        self.assertFalse(tracker.is_loop_end(loop_start.address))
+        self.assertTrue(tracker.is_loop_end(loop_end.address))
 
     def test_loop_tracker_accepts_typed_control_flow_graph(self) -> None:
         first = BasicBlock(
@@ -108,6 +114,8 @@ class LoopTrackerTests(unittest.TestCase):
         self.assertEqual(tracker.not_loop_loc, {block.address})
         self.assertIsNone(tracker.get_loop_start(block.address))
         self.assertIsNone(tracker.get_loop_end(block.address))
+        self.assertFalse(tracker.is_loop_start(block.address))
+        self.assertFalse(tracker.is_loop_end(block.address))
 
     def test_loop_start_and_end_accessors_do_not_trigger_detection(self) -> None:
         block = _legacy_block(0x08020000, (), ())

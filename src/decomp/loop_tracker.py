@@ -28,7 +28,7 @@ class LoopTracker:
         self._loc_to_loop: dict[int, LoopInfo] = {}
         self.not_loop_loc: set[int] = set() # locs which are not in a loop
 
-    def is_loop_start(self, loc: int) -> bool | None:
+    def is_loop_start(self, loc: int) -> bool:
         # print('is_loop_start', hex(loc))
         loop = self.loop_info(loc)
         if loop is not None:
@@ -40,12 +40,13 @@ class LoopTracker:
             loop = self.loop_info(loc)
             if loop is not None:
                 return loc == loop.start
+            return False
     
     def get_loop_start(self, loc: int) -> int | None:
         loop = self.loop_info(loc)
         return None if loop is None else loop.start
     
-    def is_loop_end(self, loc: int) -> bool | None:
+    def is_loop_end(self, loc: int) -> bool:
         # print('is_loop_end', hex(loc))
         loop = self.loop_info(loc)
         if loop is not None:
@@ -57,6 +58,7 @@ class LoopTracker:
             loop = self.loop_info(loc)
             if loop is not None:
                 return loc == loop.end
+            return False
     
     def get_loop_end(self, loc: int) -> int | None:
         loop = self.loop_info(loc)
