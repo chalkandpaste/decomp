@@ -241,6 +241,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_xrefs_use_control_flow_graph_methods(self) -> None:
+        self.assertEqual(
+            _attribute_access_violations(
+                Path("src/decomp/analysis/xrefs.py"),
+                "cfg",
+                {"blocks"},
+            ),
+            [],
+        )
+
     def test_render_c_condition_logic_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _raw_numeric_subscripts_in_function(
@@ -507,6 +517,17 @@ def _legacy_block_relationship_field_access(path: Path) -> list[str]:
             continue
         if _attribute_root_name(node.value) in block_names:
             violations.append(f"{path}:{node.lineno} use graph.{node.attr}(address)")
+    return violations
+
+
+def _attribute_access_violations(path: Path, root_name: str, attribute_names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute) or node.attr not in attribute_names:
+            continue
+        if _attribute_root_name(node.value) == root_name:
+            violations.append(f"{path}:{node.lineno} use {root_name} methods instead of {root_name}.{node.attr}")
     return violations
 
 

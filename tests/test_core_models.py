@@ -55,6 +55,65 @@ class CoreModelAdapterTests(unittest.TestCase):
         self.assertEqual(cfg.successors(0x08020000), (0x08020008, 0x08020004))
         self.assertEqual(cfg.predecessors(0x08020004), (0x08020000,))
 
+    def test_control_flow_graph_reachable_order_matches_graph_api(self) -> None:
+        block = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020002,
+            successors=(0x08020002, 0x08020004),
+            predecessors=(),
+            depth=0,
+            instructions=([b"0x8020000", b"2", b"0000", b"beq", b"0x8020004"],),
+        )
+        left = LegacyBlock(
+            address=0x08020002,
+            end_address=0x08020004,
+            successors=(0x08020006,),
+            predecessors=(block.address,),
+            depth=0,
+            instructions=([b"0x8020002", b"2", b"0000", b"b", b"0x8020006"],),
+        )
+        right = LegacyBlock(
+            address=0x08020004,
+            end_address=0x08020006,
+            successors=(0x08020006,),
+            predecessors=(block.address,),
+            depth=0,
+            instructions=([b"0x8020004", b"2", b"0000", b"b", b"0x8020006"],),
+        )
+        exit_block = LegacyBlock(
+            address=0x08020006,
+            end_address=0x08020008,
+            successors=(),
+            predecessors=(left.address, right.address),
+            depth=0,
+            instructions=([b"0x8020006", b"2", b"0000", b"bx", b"lr"],),
+        )
+        graph = LegacyBlockGraph(
+            entry_address=block.address,
+            blocks={
+                block.address: block,
+                left.address: left,
+                right.address: right,
+                exit_block.address: exit_block,
+            },
+        )
+        cfg = legacy_block_graph_to_cfg(graph)
+
+        self.assertTrue(cfg.has_block(block.address))
+        self.assertFalse(cfg.has_block(0x08029999))
+        self.assertEqual(
+            cfg.reachable_order(direction=True),
+            (block.address, right.address, exit_block.address, left.address),
+        )
+        self.assertEqual(
+            cfg.reachable_order(direction=False),
+            (block.address, left.address, right.address, exit_block.address),
+        )
+        self.assertEqual(
+            cfg.reachable_order(left.address, stop_address=exit_block.address),
+            (left.address,),
+        )
+
     def test_preserves_legacy_table_branch_targets(self) -> None:
         block = LegacyBlock(
             address=0x08020000,

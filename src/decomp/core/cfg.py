@@ -53,6 +53,9 @@ class ControlFlowGraph:
     def block_at(self, address: Address) -> BasicBlock:
         return self.blocks[address]
 
+    def has_block(self, address: Address) -> bool:
+        return address in self.blocks
+
     def block_starts(self) -> tuple[Address, ...]:
         return tuple(sorted(self.blocks))
 
@@ -61,6 +64,34 @@ class ControlFlowGraph:
 
     def predecessors(self, address: Address) -> tuple[Address, ...]:
         return tuple(edge.source for edge in self.block_at(address).incoming)
+
+    def reachable_order(
+        self,
+        start_address: Address | None = None,
+        direction: bool = True,
+        stop_address: Address | None = None,
+    ) -> tuple[Address, ...]:
+        start = self.entry if start_address is None else start_address
+        pop_index = -1 if direction else 0
+        retrace_nodes = [start]
+        pending = {start}
+        seen: set[Address] = set()
+        order = []
+
+        while retrace_nodes:
+            address = retrace_nodes.pop(pop_index)
+            pending.remove(address)
+            if address in seen or not self.has_block(address):
+                continue
+            seen.add(address)
+            order.append(address)
+
+            for child in self.successors(address):
+                if child != stop_address and child not in seen and child not in pending:
+                    retrace_nodes.append(child)
+                    pending.add(child)
+
+        return tuple(order)
 
     def edges(self) -> tuple[Edge, ...]:
         return tuple(

@@ -39,8 +39,8 @@ class CallReference:
 def collect_call_references(cfg: ControlFlowGraph) -> tuple[CallReference, ...]:
     references = []
 
-    for address in _reachable_block_order(cfg):
-        block = cfg.blocks[address]
+    for address in cfg.reachable_order():
+        block = cfg.block_at(address)
         references.extend(_collect_block_references(cfg.entry, block))
 
     return tuple(_dedupe_references(references))
@@ -124,25 +124,6 @@ def _literal_loaded_into_register(
             if target is not None:
                 return target & ~1
     return None
-
-
-def _reachable_block_order(cfg: ControlFlowGraph) -> list[int]:
-    retrace_nodes = [cfg.entry]
-    seen = set()
-    order = []
-
-    while retrace_nodes:
-        address = retrace_nodes.pop(-1)
-        if address in seen or address not in cfg.blocks:
-            continue
-        seen.add(address)
-        order.append(address)
-
-        for edge in cfg.blocks[address].outgoing:
-            if edge.target not in seen:
-                retrace_nodes.append(edge.target)
-
-    return order
 
 
 def _dedupe_references(references: list[CallReference]) -> list[CallReference]:
