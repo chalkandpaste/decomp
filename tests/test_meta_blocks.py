@@ -3,8 +3,8 @@ import io
 import unittest
 
 from decomp.block_graph import generate_block_graph
-from decomp.disassemble import annotate_graph
 from decomp.meta_blocks import EndBlock, MetaBlockGraph
+from decomp.structure import annotate_graph
 
 
 class MetaBlockTests(unittest.TestCase):

@@ -36,6 +36,11 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_structure_recovery_stays_out_of_disassemble_module(self) -> None:
+        disassemble_path = Path("src/decomp/disassemble.py")
+
+        self.assertEqual(_forbidden_defs(disassemble_path, {"MetaBlockFinder", "annotate_graph", "simplify_if"}), [])
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
@@ -149,6 +154,17 @@ def _meta_block_dict_usage(path: Path) -> list[str]:
             violations.append(
                 f"{path}:{node.lineno} use typed MetaBlock fields for {root_name}[{node.slice.value!r}]"
             )
+    return violations
+
+
+def _forbidden_defs(path: Path, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        if node.name in names:
+            violations.append(f"{path}:{node.lineno} {node.name} belongs in structure.py")
     return violations
 
 
