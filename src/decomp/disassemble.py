@@ -1,30 +1,19 @@
 import argparse
-from typing import TypeAlias
 
 from .loop_tracker import LoopTracker
 from .instructions import *
 from .function_signatures import generate_func_sigs, add_function_sigs, get_function_signature
-from .block_graph import generate_block_graph, print_block_graph
+from .block_graph import generate_block_graph
 from .legacy_types import LegacyBlock, LegacyBlockGraph, LegacyBlockIndex
-
-MetaBlock: TypeAlias = dict[str, object]
-MetaBlockGraph: TypeAlias = dict[str, object]
-
-
-# type if_meta_block -- block to contain if (triangle control flow)
-# { 'cond' cond, 'true' : meta_block  'next': meta_block }
-
-# type if_meta_block -- block to contain if/else
-# { 'conds' : [cond], 'true' : meta_block,  'false' : meta_block, 'next' : meta_block }
-#
-# type while_meta_block -- block to linearize while
-# { 'while' : [meta_block], 'next': meta_block }
-#
-# type case_meta_block -- block containing returns
-# { 'cases' : [meta_block], 'next' : meta_block }
-
-# type end_meta_block
-# { 'end' : block }
+from .meta_blocks import (
+    EndBlock,
+    IfBlock,
+    LinearBlock,
+    MetaBlock,
+    MetaBlockGraph,
+    SwitchBlock,
+    WhileBlock,
+)
 
 
 class MetaBlockFinder(LoopTracker):
@@ -187,8 +176,6 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
     # raise Exception
 
     meta_block_locs.reverse()
-    # print([(hex(sg['start_block']['loc']), hex(loc)) for (sg, loc) in meta_block_locs])
-
     seen_locs = {}
     loops = { }
 
@@ -196,8 +183,6 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
         # print("meta_block_locs", [(hex(s),(hex(e) if e is not None else None)) for (s,e) in meta_block_locs])
         start_loc, end_loc = meta_block_locs.pop(-1)
     
-        start_block = block_index[start_loc]
-
         print("annotate loop", hex(start_loc))
 
         meta_block_loc = start_loc
@@ -216,7 +201,6 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
         # print("pre-eating", hex(start_loc))
         while len(children) == 1 and len(children[0].predecessors) == 1 and children_locs[0] != end_loc:
             preface.append(start_loc)
-            # print("add to preface", hex(start_block['loc']))
             start_loc = children_locs[0]
             # print("eating", hex(start_loc))
             seen_locs[start_loc] = True
@@ -249,13 +233,12 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                         next_start_loc = None
                 print('next_start_loc', hex(next_start_loc) if next_start_loc is not None else None)
 
-                meta_block_index[meta_block_loc] = {
-                            'type' : 'while',
-                            'loc' : meta_block_loc,
-                            'inner' : None,
-                            'cond' : loop_end_loc, 
-                            'next' : next_start_loc
-                        }
+                meta_block_index[meta_block_loc] = WhileBlock(
+                            address=meta_block_loc,
+                            inner=None,
+                            condition_address=loop_end_loc,
+                            next_address=next_start_loc,
+                        )
                 loops[meta_block_loc] = True
                 meta_block_locs.append((meta_block_loc, loop_end_loc))
             else: # elif children_locs[0] not in seen_locs or children_locs[1] not in seen_locs:
@@ -330,28 +313,26 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                             hex(true_loc) if true_loc is not None else None,
                             hex(false_loc) if false_loc is not None else None,
                             hex(next_start_loc) if next_start_loc is not None else None)
-                    if meta_block_loc in meta_block_index and meta_block_index[meta_block_loc]['type'] == 'while':
-                        meta_block_index[meta_block_loc]['inner'] = {
-                                'type' : 'if',
-                                'loc'  : meta_block_loc,
-                                'cond' : preface,
-                                'flag' : [True],
-                                'conj' : [],
-                                'true' : true_loc,
-                                'false': false_loc,
-                                'next' : next_start_loc
-                                }
+                    if meta_block_loc in meta_block_index and isinstance(meta_block_index[meta_block_loc], WhileBlock):
+                        meta_block_index[meta_block_loc].inner = IfBlock(
+                                address=meta_block_loc,
+                                condition_blocks=preface,
+                                flags=[True],
+                                conjunctions=[],
+                                true_address=true_loc,
+                                false_address=false_loc,
+                                next_address=next_start_loc,
+                                )
                     else:
-                        meta_block_index[meta_block_loc] = {
-                                'type' : 'if',
-                                'loc'  : meta_block_loc,
-                                'cond' : preface,
-                                'flag' : [True],
-                                'conj' : [],
-                                'true' : true_loc,
-                                'false': false_loc,
-                                'next' : next_start_loc
-                                }
+                        meta_block_index[meta_block_loc] = IfBlock(
+                                address=meta_block_loc,
+                                condition_blocks=preface,
+                                flags=[True],
+                                conjunctions=[],
+                                true_address=true_loc,
+                                false_address=false_loc,
+                                next_address=next_start_loc,
+                                )
                 else:
                     pass
         elif len(children) > 2:
@@ -361,13 +342,12 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                 if (c, end_loc) not in meta_block_locs and c not in seen_locs:
                     meta_block_locs.append((c, end_loc))
 
-            meta_block_index[meta_block_loc] = {
-                    'type' : 'tbb',
-                    'loc' : meta_block_loc,
-                    'preface' : preface,
-                    'cases': children_locs,
-                    'next' : end_loc
-                    }
+            meta_block_index[meta_block_loc] = SwitchBlock(
+                    address=meta_block_loc,
+                    preface=preface,
+                    cases=tuple(children_locs),
+                    next_address=end_loc,
+                    )
 
         elif len(children) == 1:
             print("making block node", hex(meta_block_loc))
@@ -407,74 +387,60 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
             print('end_loc', hex(end_loc) if end_loc is not None else None)
 
             if next_end is not None or (next_end is None and end_loc is None):
-                meta_block_index[meta_block_loc] = {
-                            'type' : 'block',
-                            'loc' : meta_block_loc,
-                            'blocks' : blocks,
-                            'next' : next_loc
-                        }
+                meta_block_index[meta_block_loc] = LinearBlock(
+                            address=meta_block_loc,
+                            block_addresses=blocks,
+                            next_address=next_loc,
+                        )
 
             else:
                 # print('no next')
-                meta_block_index[meta_block_loc] = {
-                            'type' : 'block',
-                            'loc' : meta_block_loc,
-                            'blocks' : blocks,
-                            'next' : None
-                        }
+                meta_block_index[meta_block_loc] = LinearBlock(
+                            address=meta_block_loc,
+                            block_addresses=blocks,
+                            next_address=None,
+                        )
             
 
         elif len(children) == 0:
            # print('making end_node')
-            end_block = preface
-            meta_block_index[meta_block_loc] = {
-                        'type' : 'end',
-                        'blocks' : preface
-                    }
+            meta_block_index[meta_block_loc] = EndBlock(
+                        address=meta_block_loc,
+                        block_addresses=preface,
+                    )
         else:
             raise Exception
 
-    meta_block_graph = { 
-            'index' : block_index, 
-            'meta_block_index': meta_block_index, 
-            'start_block' : meta_block_start 
-            }
-
-    return meta_block_graph
+    return MetaBlockGraph(
+            block_index=block_index,
+            meta_blocks=meta_block_index,
+            entry_address=meta_block_start,
+            )
 
 def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
-    block_index = meta_block_graph['index']
-    meta_index = meta_block_graph['meta_block_index']
-    start = meta_block_graph['start_block']
+    meta_index = meta_block_graph.meta_blocks
+    start = meta_block_graph.entry_address
 
     seen_loops = {} # prevent loops...
 
-    start_node = meta_index[start]
-
     def simplify_base_node(node: MetaBlock) -> int | None:
-        out = b''
-        ty = node['type']
-        if ty == 'if':
+        if isinstance(node, IfBlock):
             # print("if node")
-            cond = node['cond']
+            cond = node.condition_blocks
             # true and false get switched when written
-            true_loc = node['false']
-            false_loc = node['true']
-            # print("node tf_locs", hex(true_loc) if true_loc is not None else None,
-                    # hex(false_loc) if false_loc is not None else None,
-                    # hex(node['next']) if node['next'] is not None else None)
-            
+            true_loc = node.false_address
+            false_loc = node.true_address
             # descend down the true side to track if true and false of the child
             # match up with the false loc of the parent (i.e., total of 2 unique locs not 3)
             # and simplify
 
             true_node = meta_index[true_loc] if true_loc is not None else None
             
-            if true_node is not None and true_node['type'] == 'if':
+            if isinstance(true_node, IfBlock):
                 # print('checking if for simplification')
-                child_true_loc = true_node['false']
-                child_false_loc = true_node['true']
-                child_next_loc = true_node['next']
+                child_true_loc = true_node.false_address
+                child_false_loc = true_node.true_address
+                child_next_loc = true_node.next_address
 
                
                 # print('child_true_loc', hex(child_true_loc) if child_true_loc is not None else None)
@@ -484,73 +450,64 @@ def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
                 # if it's a conjunction it would not have a next, only the parent can have a next
                 if child_next_loc is None and child_true_loc == false_loc: 
                     # print('simplifying')
-                    node['cond'] += true_node['cond']
-                    node['false'] = child_false_loc
-                    node['conj'] += [b' && '] + [b' && ' if c == b' || ' else b' || ' for c in true_node['conj']]
-                    node['flag'] = node['flag'] + true_node['flag'].copy()
+                    node.condition_blocks += true_node.condition_blocks
+                    node.false_address = child_false_loc
+                    node.conjunctions += [b' && '] + [b' && ' if c == b' || ' else b' || ' for c in true_node.conjunctions]
+                    node.flags = node.flags + true_node.flags.copy()
                     # repeat this until there are no simplifications
-                    node_loc = node['loc']
+                    node_loc = node.address
                 elif child_next_loc is None and child_false_loc == false_loc:
                     # print('simplifying')
-                    node['cond'] += true_node['cond']
-                    node['false'] = child_true_loc
-                    node['conj'] += [b' && '] + true_node['conj']
-                    node['flag'] = node['flag'] + true_node['flag'].copy()
+                    node.condition_blocks += true_node.condition_blocks
+                    node.false_address = child_true_loc
+                    node.conjunctions += [b' && '] + true_node.conjunctions
+                    node.flags = node.flags + true_node.flags.copy()
                     
                     # repeat this until there are no simplifications
-                    node_loc = node['loc']
+                    node_loc = node.address
                 else:
                     if true_loc is not None:
                         simplify_node_loc(true_loc)
                     if false_loc is not None:
                         simplify_node_loc(false_loc)
 
-                    node_loc = node['next']
+                    node_loc = node.next_address
             else:
                 if true_loc is not None:
                     simplify_node_loc(true_loc)
                 if false_loc is not None:
                     simplify_node_loc(false_loc)
-                node_loc = node['next']
+                node_loc = node.next_address
 
 
-            # if node['next'] is not None:
-                # # print("if node_next:", hex(node_loc))
-            # else:
-                # print("if end")
-
-        elif ty == 'while':
+        elif isinstance(node, WhileBlock):
             raise Exception # don't think we should come here, but otherwise pass
-            pass
 
-        elif ty == 'block':
-            node_loc = node['next']
+        elif isinstance(node, LinearBlock):
+            node_loc = node.next_address
             # print('next node_loc', node_loc)
 
-        elif ty == 'end':
+        elif isinstance(node, EndBlock):
             node_loc = None
         
-        elif ty == 'tbb':
-            for c in node['cases']:
+        elif isinstance(node, SwitchBlock):
+            for c in node.cases:
                 simplify_node_loc(c)
 
-            node_loc = node['next']
+            node_loc = node.next_address
         else:
-            # print("node", node)
-            # print(node['type'])
             raise Exception
         return node_loc
 
     def simplify_node(node: MetaBlock | None) -> None:
         while node is not None:
-            ty = node['type']
             # manually unwrap and progress while, because it uses `inner` which is a meta_block, not loc
-            if ty == 'while':
-                node_loc = node['loc']
+            if isinstance(node, WhileBlock):
+                node_loc = node.address
                 seen_loops[node_loc] = True
-                simplify_node(node['inner'])
+                simplify_node(node.inner)
                 
-                node_loc = node['next']
+                node_loc = node.next_address
             else:
                 node_loc = simplify_base_node(node)
             
@@ -728,95 +685,81 @@ def print_if_cond(
     return cond_out, cond_expr
 
 def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
-    block_index = meta_block_graph['index']
-    meta_index = meta_block_graph['meta_block_index']
-    start = meta_block_graph['start_block']
+    block_index = meta_block_graph.block_index
+    meta_index = meta_block_graph.meta_blocks
+    start = meta_block_graph.entry_address
 
     seen_loops = {} # prevent loops...
 
-    start_node = meta_index[start]
-
     def print_base_node(node: MetaBlock) -> tuple[int | None, bytes]:
         out = b''
-        ty = node['type']
-        if ty == 'if':
+        if isinstance(node, IfBlock):
             # print("if node")
-            cond = node['cond']
-            conj = node['conj'] if 'conj' in node else []
-            flags = node['flag'] if 'flag' in node else []
+            cond = node.condition_blocks
+            conj = node.conjunctions
+            flags = node.flags
 
             cond_block_out, cond_expr = print_if_cond(cond, conj, flags, block_index)
 
-            true_loc = node['false']
-            false_loc = node['true']
-            # print("node tf_locs", hex(true_loc) if true_loc is not None else None,
-                    # hex(false_loc) if false_loc is not None else None,
-                    # hex(node['next']) if node['next'] is not None else None)
-            if true_loc is None or true_loc == node['next'] or true_loc in seen_loops:
+            true_loc = node.false_address
+            false_loc = node.true_address
+            if true_loc is None or true_loc == node.next_address or true_loc in seen_loops:
                 true_out = b'if ( ' + cond_expr + b' ) \n{\n\n}\n'
             else:
                 true_out = b'if ( ' + cond_expr + b' ) \n{\n' + print_node_loc(true_loc) + b'\n}\n'
 
-            if false_loc is None or false_loc == node['next'] or false_loc in seen_loops or false_loc is None:
+            if false_loc is None or false_loc == node.next_address or false_loc in seen_loops or false_loc is None:
                 false_out = b''
             else:
                 false_out = b'else\n{\n' + print_node_loc(false_loc) + b'\n}\n'
 
 
             out += (cond_block_out + true_out + false_out)
-            # if node['next'] != 
-            node_loc = node['next']
-            # if node['next'] is not None:
-                # # print("if node_next:", hex(node_loc))
-            # else:
-                # print("if end")
+            node_loc = node.next_address
 
-        elif ty == 'while':
+        elif isinstance(node, WhileBlock):
             raise Exception # don't think we should come here, but otherwise pass
-            pass
 
-        elif ty == 'block':
-            block_out = b'\n'.join( [print_block(block_index[b]) for b in node['blocks']] )
+        elif isinstance(node, LinearBlock):
+            block_out = b'\n'.join( [print_block(block_index[b]) for b in node.block_addresses] )
 
             out += block_out
-            node_loc = node['next']
+            node_loc = node.next_address
             # print('next node_loc', node_loc)
 
-        elif ty == 'end':
-            end_out = b'\n'.join( [print_block(block_index[b]) for b in node['blocks']] )
+        elif isinstance(node, EndBlock):
+            end_out = b'\n'.join( [print_block(block_index[b]) for b in node.block_addresses] )
             end_out += b'\nreturn;\n'
             out += end_out
             node_loc = None
-        elif ty == 'tbb':
+        elif isinstance(node, SwitchBlock):
             c_out = b''
-            for (i,c) in enumerate(node['cases']):
+            for (i,c) in enumerate(node.cases):
                 c_out += b'\ncase ' + bytes(str(i), 'utf-8') + b':\n' + print_node_loc(c)
 
-            block_out = b'\n'.join([print_block(block_index[i]) for i in node['preface']])
+            block_out = b'\n'.join([print_block(block_index[i]) for i in node.preface])
 
-            switch_insn = block_index[node['preface'][-1]].instructions[-1]
+            switch_insn = block_index[node.preface[-1]].instructions[-1]
             switch_var = crs(switch_insn[5])
 
 
             out += block_out + b'\nswitch(' + switch_var + b') \n{\n' + c_out + b'\n}\n'
-            node_loc = node['next']
+            node_loc = node.next_address
         else:
             print("node", node)
-            print(node['type'])
             raise Exception
         return node_loc, out
 
     def print_node(node: MetaBlock | None) -> bytes:
         out = b''
         while node is not None:
-            ty = node['type']
             # manually unwrap and progress while, because it uses `inner` which is a meta_block, not loc
-            if ty == 'while':
+            if isinstance(node, WhileBlock):
                 # print("while node")
-                node_loc = node['loc']
+                node_loc = node.address
                 seen_loops[node_loc] = True
-                inner = node['inner']
-                cond = node['cond']
+                inner = node.inner
+                cond = node.condition_address
                 while_out = print_node(inner)
                 cond_out,cond_expr = print_if_cond([cond], [], [True], block_index)
                 while_out = b'while (1) \n{\n' + while_out + cond_out +\
@@ -824,7 +767,7 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
                         b'\n}\n'
                 out += while_out
                 
-                node_loc = node['next']
+                node_loc = node.next_address
             else:
                 # print("base node")
                 node_loc, base_out = print_base_node(node)
