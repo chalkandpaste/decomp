@@ -27,7 +27,7 @@ class Operand:
         if isinstance(self.value, str):
             return self.value
 
-        normalized = self.text.strip(",]")
+        normalized = self.text.strip("[{} ,]")
         if _looks_like_register(normalized):
             return normalized
         return None

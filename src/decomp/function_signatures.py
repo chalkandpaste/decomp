@@ -1,11 +1,13 @@
 from .block_graph import generate_block_graph
 from .analysis import collect_function_addresses
+from .arch.arm_thumb import ArmThumbBackend
+from .arch.arm_thumb.register_effects import RegisterEffect, register_effect
 from .legacy_adapter import legacy_block_graph_to_cfg
 from .legacy_instruction import mnemonic, operand_int, with_appended_token
-from .legacy_types import LegacyBlockGraph, LegacyRegisterScope
+from .legacy_types import LegacyBlockGraph, LegacyInstruction, LegacyRegisterScope
 
 from .loop_tracker import LoopTracker
-from .instructions import *
+from .instructions import func_call, uncond_block_end
     
 skip_functions = [ 134469972, 134471256, 134469472, 134471424, 134472782, 134455624, 134470750, 134472518,
             0x8020298, 0x80205d6, 0x802fe84, 0x8020ccc, 0x8020334, 0x8020f24, 0x8020c40, 0x8021470, 0x8021340,
@@ -59,6 +61,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
     entry_address = block_graph.entry_address
     print('get_function_signature', hex(entry_address))
 
+    backend = ArmThumbBackend()
     loop_tracker = LoopTracker(block_graph)
     loops = {}
 
@@ -85,184 +88,9 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
 
         insns = block.instructions
         for i in insns:
-            insn = i[3:]
-            if insn[0] in base_arith + mul + div + vmlas + cast + bits + move + load:
-                if len(insn) == 3:
-                    reg_alive = crs(insn[1])
-                    reg_kill = crs(insn[2])
-                    if reg_kill in scope:
-                        scope[reg_kill] = False
-                    if reg_alive in scope:
-                        scope[reg_alive] = True
-                elif len(insn) == 4 or len(insn) == 6 or (insn[0] in add and len(insn) == 8):
-                    reg_alive = crs(insn[1])
-                    reg_kill1 = crs(insn[2])
-                    reg_kill2 = crs(insn[3])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                    if reg_alive in scope:
-                        scope[reg_alive] = True
-                elif insn[0] in move and len(insn) == 5:
-                    reg_alive = crs(insn[1])
-                    reg_kill = crs(insn[2])
-                    if reg_kill in scope:
-                        scope[reg_kill] = False
-                    if reg_alive in scope:
-                        scope[reg_alive] = True
-                elif insn[0] in bits and len(insn) == 4:
-                    # don't make alive as rX gets re-used
-                    reg_kill1 = crs(insn[2])
-                    reg_kill2 = crs(insn[3])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                elif insn[0] in vmlas + bits and len(insn) == 5:
-                    reg_alive = crs(insn[1])
-                    reg_kill1 = crs(insn[2])
-                    reg_kill2 = crs(insn[3])
-                    reg_kill3 = crs(insn[4])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                    if reg_kill3 in scope:
-                        scope[reg_kill3] = False
-                    if reg_alive in scope:
-                        scope[reg_alive] = True
-                else:
-                    print(insn)
-                    raise Exception
-            elif insn[0] in smull: # signed long mul + store double
-                reg_alive1 = crs(insn[2])
-                reg_alive2 = crs(insn[1])
-                reg_kill1 = crs(insn[3])
-                reg_kill2 = crs(insn[4])
-                if reg_kill1 in scope:
-                    scope[reg_kill1] = False
-                if reg_kill2 in scope:
-                    scope[reg_kill2] = False
-                if reg_alive1 in scope:
-                    scope[reg_alive1] = True
-                if reg_alive2 in scope:
-                    scope[reg_alive2] = True
-            elif insn[0] in store:
-                if len(insn) == 3:
-                    reg_kill1 = crs(insn[1])
-                    reg_kill2 = crs(insn[2])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                elif len(insn) == 4 or len(insn) == 6:
-                    reg_kill1 = crs(insn[1])
-                    reg_kill2 = crs(insn[2])
-                    reg_kill3 = crs(insn[3])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                    if reg_kill3 in scope:
-                        scope[reg_kill3] = False
-                else:
-                    print(insn)
-                    raise Exception
-            elif insn[0] in store_d: #
-                if len(insn) == 4: 
-                    reg_kill1 = crs(insn[2])
-                    reg_kill2 = crs(insn[1])
-                    reg_kill3 = crs(insn[3])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                    if reg_kill3 in scope:
-                        scope[reg_kill3] = False
-                elif len(insn) == 5:
-                    reg_kill1 = crs(insn[2])
-                    reg_kill2 = crs(insn[1])
-                    reg_kill3 = crs(insn[3])
-                    reg_kill4 = crs(insn[4])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                    if reg_kill3 in scope:
-                        scope[reg_kill3] = False
-                    if reg_kill4 in scope:
-                        scope[reg_kill4] = False
-
-                else:
-                    print(insn)
-                    raise Exception
-            elif insn[0] in load_d: #
-                if len(insn) == 4:
-                    reg_alive1 = crs(insn[2])
-                    reg_alive2 = crs(insn[1])
-                    reg_kill1 = crs(insn[3])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-                elif len(insn) == 5:
-                    reg_alive1 = crs(insn[2])
-                    reg_alive2 = crs(insn[1])
-                    reg_kill1 = crs(insn[3])
-                    reg_kill2 = crs(insn[4])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-
-                else:
-                    print(insn)
-                    raise Exception
-            elif insn[0] in sxtab:
-                if len(insn) == 4 or len(insn) == 6:
-                    reg_alive = crs(insn[1])
-                    reg_kill1 = crs(insn[2])
-                    reg_kill2 = crs(insn[3])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                    if reg_alive in scope:
-                        scope[reg_alive] = True
-                else:
-                    print(insn)
-                    raise Exception
-            elif insn[0] in compares + tst:
-                if len(insn) == 3 or len(insn) == 5:
-                    reg_kill1 = crs(insn[1])
-                    reg_kill2 = crs(insn[2])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                else:
-                    print(insn)
-                    raise Exception
-
-            elif insn[0] in cond_block_end_zero:
-                if len(insn) == 3:
-                    reg_kill = crs(insn[1])
-                    if reg_kill in scope:
-                        scope[reg_kill] = False
-                else:
-                    raise Exception
-            elif insn[0] in func_start + func_end + func_call + uncond_block_end + vpop + cond_block_end + tbb + nop + exchange_return + exchange_func_call + vdup + coprocessor: # ignore
-                pass
-            else:
-                print(i)
-                raise Exception
+            effect = _register_effect_for_legacy_instruction(backend, i)
+            if effect is not None:
+                _apply_forward_register_effect(scope, effect)
 
         loc_scope[loc] = scope
 
@@ -327,182 +155,9 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
         insns.reverse()
 
         for i in insns:
-            insn = i[3:]
-            if insn[0] in base_arith + mul + div + vmlas + cast + bits + move + load:
-                if len(insn) == 3:
-                    reg_klll = crs(insn[1])
-                    reg_alive = crs(insn[2])
-                    if reg_kill in scope:
-                        scope[reg_kill] = False
-                    if reg_alive in scope:
-                        scope[reg_alive] = True
-                elif len(insn) == 4 or len(insn) == 6 or (insn[0] in add and len(insn) == 8):
-                    reg_kill = crs(insn[1])
-                    reg_alive1 = crs(insn[2])
-                    reg_alive2 = crs(insn[3])
-                    if reg_kill in scope:
-                        scope[reg_kill] = False
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-                elif insn[0] in bits and len(insn) == 4:
-                    # don't kill as rX gets re-used
-                    reg_alive1 = crs(insn[2])
-                    reg_alive2 = crs(insn[3])
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-                elif insn[0] in move and len(insn) == 5:
-                    reg_kill = crs(insn[1])
-                    reg_alive = crs(insn[2])
-                    if reg_kill in scope:
-                        scope[reg_kill] = False
-                    if reg_alive in scope:
-                        scope[reg_alive] = True
-                elif insn[0] in vmlas + bits and len(insn) == 5:
-                    reg_kill = crs(insn[1])
-                    reg_alive1 = crs(insn[2])
-                    reg_alive2 = crs(insn[3])
-                    reg_alive3 = crs(insn[4])
-                    if reg_kill in scope:
-                        scope[reg_kill] = False
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-                    if reg_alive3 in scope:
-                        scope[reg_alive3] = True
-                else:
-                    print(insn)
-                    raise Exception
-            elif insn[0] in smull: # long signed multiplication, also store_d 
-                reg_kill1 = crs(insn[2])
-                reg_kill2 = crs(insn[1])
-                reg_alive1 = crs(insn[3])
-                reg_alive2 = crs(insn[4])
-                if reg_kill1 in scope:
-                    scope[reg_kill1] = False
-                if reg_kill2 in scope:
-                    scope[reg_kill2] = False
-                if reg_alive1 in scope:
-                    scope[reg_alive1] = True
-                if reg_alive2 in scope:
-                    scope[reg_alive2] = True
-            elif insn[0] in store:
-                if len(insn) == 3:
-                    reg_alive1 = crs(insn[1])
-                    reg_alive2 = crs(insn[2])
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-                elif len(insn) == 4 or len(insn) == 6:
-                    reg_alive1 = crs(insn[1])
-                    reg_alive2 = crs(insn[2])
-                    reg_alive3 = crs(insn[3])
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-                    if reg_alive3 in scope:
-                        scope[reg_alive3] = True
-                else:
-                    print(insn)
-                    raise Exception
-            elif insn[0] in store_d:
-                if len(insn) == 4:
-                    reg_alive1 = crs(insn[2])
-                    reg_alive2 = crs(insn[1])
-                    reg_alive3 = crs(insn[3])
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-                    if reg_alive3 in scope:
-                        scope[reg_alive2] = True
-                elif len(insn) == 5:
-                    reg_alive1 = crs(insn[2])
-                    reg_alive2 = crs(insn[1])
-                    reg_alive3 = crs(insn[3])
-                    reg_alive4 = crs(insn[3])
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-                    if reg_alive3 in scope:
-                        scope[reg_alive3] = True
-                    if reg_alive4 in scope:
-                        scope[reg_alive4] = True
-                else:
-                    print(insn)
-                    raise Exception
-            elif insn[0] in load_d:
-                if len(insn) == 4:
-                    reg_kill1 = crs(insn[2])
-                    reg_kill2 = crs(insn[1])
-                    reg_alive1 = crs(insn[3])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                elif len(insn) == 5:
-                    reg_kill1 = crs(insn[2])
-                    reg_kill2 = crs(insn[1])
-                    reg_alive1 = crs(insn[3])
-                    reg_alive2 = crs(insn[4])
-                    if reg_kill1 in scope:
-                        scope[reg_kill1] = False
-                    if reg_kill2 in scope:
-                        scope[reg_kill2] = False
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-                else:
-                    print(insn)
-                    raise Exception
-            elif insn[0] in sxtab:
-                if len(insn) == 4 or len(insn) == 6:
-                    reg_kill = crs(insn[1])
-                    reg_alive1 = crs(insn[2])
-                    reg_alive2 = crs(insn[3])
-                    if reg_kill in scope:
-                        scope[reg_kill] = False
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_alive2 in scope:
-                        scope[reg_alive2] = True
-                else:
-                    print(insn)
-                    raise Exception
-            elif insn[0] in compares + tst:
-                if len(insn) == 3 or len(insn) == 5:
-                    reg_alive1 = crs(insn[1])
-                    reg_alive2 = crs(insn[2])
-                    if reg_alive1 in scope:
-                        scope[reg_alive1] = True
-                    if reg_kill2 in scope:
-                        scope[reg_alive2] = True
-                else:
-                    print(insn)
-                    raise Exception
-
-            elif insn[0] in cond_block_end_zero:
-                if len(insn) == 3:
-                    reg_alive = crs(insn[1])
-                    if reg_alive in scope:
-                        scope[reg_alive] = True
-                else:
-                    raise Exception
-            elif insn[0] in func_start + func_end + func_call + uncond_block_end + vpop + cond_block_end + tbb + nop + exchange_return + exchange_func_call + vdup + coprocessor: # ignore
-                pass
-            else:
-                print(i)
-                raise Exception
+            effect = _register_effect_for_legacy_instruction(backend, i)
+            if effect is not None:
+                _apply_backward_register_effect(scope, effect)
 
         loc_scope[loc] = scope
 
@@ -525,6 +180,33 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
     arg_scope = loc_scope[entry_address]
 
     return return_scope, arg_scope
+
+
+def _register_effect_for_legacy_instruction(
+    backend: ArmThumbBackend,
+    instruction: LegacyInstruction,
+) -> RegisterEffect | None:
+    return register_effect(backend.decode_legacy_tokens(instruction))
+
+
+def _apply_forward_register_effect(scope: LegacyRegisterScope, effect: RegisterEffect) -> None:
+    for register in effect.reads:
+        _set_scope_register(scope, register, False)
+    for register in effect.writes:
+        _set_scope_register(scope, register, True)
+
+
+def _apply_backward_register_effect(scope: LegacyRegisterScope, effect: RegisterEffect) -> None:
+    for register in effect.writes:
+        _set_scope_register(scope, register, False)
+    for register in effect.reads:
+        _set_scope_register(scope, register, True)
+
+
+def _set_scope_register(scope: LegacyRegisterScope, register: bytes, value: bool) -> None:
+    if register in scope:
+        scope[register] = value
+
 
 def generate_set_of_funcs(binary: bytes, entry_point_loc: int) -> list[int]:
     search_locs = [entry_point_loc]

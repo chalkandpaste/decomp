@@ -122,6 +122,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_get_function_signature_uses_register_effect_model(self) -> None:
+        self.assertEqual(
+            _function_call_violations(
+                Path("src/decomp/function_signatures.py"),
+                "get_function_signature",
+                {"crs"},
+            ),
+            [],
+        )
+
     def test_get_children_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _raw_numeric_subscripts_in_function(
