@@ -1,19 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Callable, Literal, TypeAlias
+from typing import Callable, TypeAlias
 
 
 LegacyToken: TypeAlias = bytes | int | list[int]
 LegacyInstruction: TypeAlias = list[LegacyToken]
 LegacyBlockIndex: TypeAlias = dict[int, "LegacyBlock"]
 LegacyRegisterScope: TypeAlias = dict[bytes, bool]
-
-LegacyBlockKey: TypeAlias = Literal["loc", "end_loc", "block", "children", "parents", "depth"]
-LegacyBlockGraphKey: TypeAlias = Literal["index", "start_block"]
-LegacyLineSectionKey: TypeAlias = Literal["type", "section"]
-LegacyConvertedSectionKey: TypeAlias = Literal["type", "section", "code"]
-
 
 @dataclass(frozen=True)
 class LegacyBlock:
@@ -46,17 +40,6 @@ class LegacyBlock:
 
     def with_instructions(self, instructions: tuple[LegacyInstruction, ...]) -> "LegacyBlock":
         return replace(self, instructions=instructions)
-
-    def __getitem__(self, key: LegacyBlockKey) -> object:
-        return getattr(self, key)
-
-    def __contains__(self, key: object) -> bool:
-        return isinstance(key, str) and hasattr(self, key)
-
-    def get(self, key: LegacyBlockKey, default: object | None = None) -> object:
-        if key in self:
-            return getattr(self, key)
-        return default
 
 
 @dataclass(frozen=True)
@@ -110,28 +93,11 @@ class LegacyBlockGraph:
 
         return order
 
-    def __getitem__(self, key: LegacyBlockGraphKey) -> object:
-        return getattr(self, key)
-
-    def __contains__(self, key: object) -> bool:
-        return isinstance(key, str) and hasattr(self, key)
-
-    def get(self, key: LegacyBlockGraphKey, default: object | None = None) -> object:
-        if key in self:
-            return getattr(self, key)
-        return default
-
 
 @dataclass(frozen=True)
 class LegacyLineSection:
     type: bool
     section: tuple[bytes, ...]
-
-    def __getitem__(self, key: LegacyLineSectionKey) -> object:
-        return getattr(self, key)
-
-    def __contains__(self, key: object) -> bool:
-        return isinstance(key, str) and hasattr(self, key)
 
 
 @dataclass(frozen=True)
@@ -139,12 +105,6 @@ class LegacyConvertedSection:
     type: bool
     section: tuple[bytes, ...]
     code: tuple[bytes, ...] | None
-
-    def __getitem__(self, key: LegacyConvertedSectionKey) -> object:
-        return getattr(self, key)
-
-    def __contains__(self, key: object) -> bool:
-        return isinstance(key, str) and hasattr(self, key)
 
 
 LegacyTraversalFn: TypeAlias = Callable[[LegacyBlock, LegacyBlockGraph, object], object]

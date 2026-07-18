@@ -28,6 +28,15 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_legacy_records_do_not_expose_mapping_protocol(self) -> None:
+        self.assertEqual(
+            _forbidden_methods(
+                Path("src/decomp/legacy_types.py"),
+                {"__getitem__", "__contains__", "get"},
+            ),
+            [],
+        )
+
     def test_meta_blocks_use_typed_records(self) -> None:
         violations = []
         for root in (Path("src/decomp"), Path("tests")):
@@ -83,6 +92,14 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         for root in (Path("src/decomp"), Path("tests")):
             for path in sorted(root.rglob("*.py")):
                 violations.extend(_legacy_meta_block_graph_constructor_keywords(path))
+
+        self.assertEqual(violations, [])
+
+    def test_meta_block_graph_uses_source_blocks_name(self) -> None:
+        violations = []
+        for root in (Path("src/decomp"), Path("tests")):
+            for path in sorted(root.rglob("*.py")):
+                violations.extend(_legacy_meta_block_graph_block_index_access(path))
 
         self.assertEqual(violations, [])
 
@@ -213,6 +230,18 @@ def _forbidden_defs(path: Path, names: set[str]) -> list[str]:
     return violations
 
 
+def _forbidden_methods(path: Path, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for item in node.body:
+            if isinstance(item, ast.FunctionDef) and item.name in names:
+                violations.append(f"{path}:{item.lineno} {node.name}.{item.name} is a retired compatibility shim")
+    return violations
+
+
 def _raw_block_index_access(path: Path) -> list[str]:
     violations = []
     tree = ast.parse(path.read_text(), filename=str(path))
@@ -248,6 +277,17 @@ def _legacy_meta_block_graph_constructor_keywords(path: Path) -> list[str]:
         for keyword in node.keywords:
             if keyword.arg == "block_index":
                 violations.append(f"{path}:{node.lineno} construct MetaBlockGraph with source_blocks=")
+    return violations
+
+
+def _legacy_meta_block_graph_block_index_access(path: Path) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute):
+            continue
+        if node.attr == "block_index":
+            violations.append(f"{path}:{node.lineno} use MetaBlockGraph.source_blocks")
     return violations
 
 

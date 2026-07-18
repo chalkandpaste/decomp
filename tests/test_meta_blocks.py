@@ -44,7 +44,7 @@ class MetaBlockTests(unittest.TestCase):
         )
 
         self.assertIs(graph.source_block_at(block.address), block)
-        self.assertEqual(graph.block_index, graph.source_blocks)
+        self.assertEqual(graph.source_blocks, {block.address: block})
 
     def test_meta_block_graph_can_be_built_from_legacy_graph(self) -> None:
         block = LegacyBlock(

@@ -81,10 +81,6 @@ class MetaBlockGraph:
         self.meta_blocks = meta_blocks
         self.entry_address = entry_address
 
-    @property
-    def block_index(self) -> LegacyBlockIndex:
-        return self.source_blocks
-
     @classmethod
     def from_legacy_graph(
         cls,
