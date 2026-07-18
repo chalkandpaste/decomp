@@ -16,6 +16,11 @@ class CoreModelAdapterTests(unittest.TestCase):
 
         self.assertEqual(flow.successor_addresses(0x08020002), (0x08020010, 0x08020004))
 
+    def test_flow_info_reports_normalized_target_addresses(self) -> None:
+        flow = FlowInfo(kind=FlowKind.CALL, targets=(0x08020011, 0x08020020))
+
+        self.assertEqual(flow.target_addresses(lambda address: address & ~1), (0x08020010, 0x08020020))
+
     def test_flow_info_rejects_incomplete_conditional_branch_successors(self) -> None:
         flow = FlowInfo(kind=FlowKind.CONDITIONAL_BRANCH, targets=())
 

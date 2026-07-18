@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from decomp.arch.arm_thumb.addresses import normalize_interworking_address
 from decomp.core.cfg import BasicBlock, ControlFlowGraph
 from decomp.core.instruction import Instruction
 from decomp.instructions import (
@@ -59,11 +60,11 @@ def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReferen
         mnemonic = _mnemonic(instruction)
 
         if mnemonic in func_call:
-            for target in instruction.flow.targets:
+            for target in instruction.flow.target_addresses(normalize_interworking_address):
                 references.append(
                     CallReference(
                         source=instruction.address,
-                        target=target & ~1,
+                        target=target,
                         kind=CallReferenceKind.DIRECT_CALL,
                     )
                 )
@@ -80,8 +81,7 @@ def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReferen
                         )
                     )
         elif mnemonic in uncond_block_end:
-            for target in instruction.flow.targets:
-                target = target & ~1
+            for target in instruction.flow.target_addresses(normalize_interworking_address):
                 if block.address == entry and target < entry:
                     references.append(
                         CallReference(
@@ -100,11 +100,11 @@ def _tail_branches_after_restore(instructions: tuple[Instruction, ...], start_in
     references = []
     for instruction in instructions[start_index:]:
         if _mnemonic(instruction) in uncond_block_end:
-            for target in instruction.flow.targets:
+            for target in instruction.flow.target_addresses(normalize_interworking_address):
                 references.append(
                     CallReference(
                         source=instruction.address,
-                        target=target & ~1,
+                        target=target,
                         kind=CallReferenceKind.RESTORE_TAIL_BRANCH,
                     )
                 )
@@ -122,7 +122,7 @@ def _literal_loaded_into_register(
         if _mnemonic(previous) in move and previous.operand_register(0) == register:
             target = previous.operand_int(1)
             if target is not None:
-                return target & ~1
+                return normalize_interworking_address(target)
     return None
 
 

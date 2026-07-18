@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -38,6 +39,11 @@ class FlowInfo:
     fallthrough: Address | None = None
     is_function_exit: bool = False
     metadata: dict[str, str] = field(default_factory=dict)
+
+    def target_addresses(self, normalize: Callable[[Address], Address] | None = None) -> tuple[Address, ...]:
+        if normalize is None:
+            return self.targets
+        return tuple(normalize(target) for target in self.targets)
 
     def successor_addresses(self, default_fallthrough: Address) -> tuple[Address, ...]:
         if self.kind == FlowKind.CONDITIONAL_BRANCH:

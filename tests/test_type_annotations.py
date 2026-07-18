@@ -339,6 +339,22 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
         self.assertEqual(
+            _flow_attribute_access_in_function(
+                Path("src/decomp/analysis/xrefs.py"),
+                "_collect_block_references",
+                {"targets"},
+            ),
+            [],
+        )
+        self.assertEqual(
+            _flow_attribute_access_in_function(
+                Path("src/decomp/analysis/xrefs.py"),
+                "_tail_branches_after_restore",
+                {"targets"},
+            ),
+            [],
+        )
+        self.assertEqual(
             _function_call_violations(
                 Path("src/decomp/analysis/xrefs.py"),
                 "_tail_branches_after_restore",
@@ -374,6 +390,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             ),
             [],
         )
+
+    def test_thumb_address_normalization_stays_in_arch_helper(self) -> None:
+        violations = []
+        helper_path = Path("src/decomp/arch/arm_thumb/addresses.py")
+        for path in sorted(Path("src/decomp").rglob("*.py")):
+            if path == helper_path:
+                continue
+            violations.extend(_inline_thumb_address_mask_violations(path))
+
+        self.assertEqual(violations, [])
 
     def test_render_c_condition_logic_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
@@ -858,6 +884,26 @@ def _call_argument_name_violations(
                 if isinstance(argument, ast.Name) and argument.id in argument_names:
                     violations.append(f"{path}:{child.lineno} {function_name} should not pass {argument.id} to {call_name}")
     return violations
+
+
+def _inline_thumb_address_mask_violations(path: Path) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.BinOp) or not isinstance(node.op, ast.BitAnd):
+            continue
+        if _is_bitwise_not_one(node.left) or _is_bitwise_not_one(node.right):
+            violations.append(f"{path}:{node.lineno} use normalize_interworking_address()")
+    return violations
+
+
+def _is_bitwise_not_one(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.UnaryOp)
+        and isinstance(node.op, ast.Invert)
+        and isinstance(node.operand, ast.Constant)
+        and node.operand.value == 1
+    )
 
 
 def _call_name(node: ast.AST) -> str | None:

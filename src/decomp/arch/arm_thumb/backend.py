@@ -5,6 +5,7 @@ import struct
 import subprocess
 
 from decomp.arch.base import DisassemblerConfig
+from decomp.arch.arm_thumb.addresses import normalize_interworking_address
 from decomp.core.flow import FlowInfo, FlowKind
 from decomp.core.image import FirmwareImage
 from decomp.core.instruction import Instruction, Operand, OperandKind
@@ -152,7 +153,7 @@ class ArmThumbBackend:
         if mnemonic in func_call and len(tokens) >= 5:
             return FlowInfo(
                 kind=FlowKind.CALL,
-                targets=(int(tokens[4], 0) & ~1,),
+                targets=(normalize_interworking_address(int(tokens[4], 0)),),
                 fallthrough=fallthrough,
             )
         if mnemonic in exchange_func_call:
@@ -192,7 +193,7 @@ class ArmThumbBackend:
         if mnemonic in func_call and len(tokens) >= 5:
             return FlowInfo(
                 kind=FlowKind.CALL,
-                targets=(int(tokens[4], 0) & ~1,),
+                targets=(normalize_interworking_address(int(tokens[4], 0)),),
                 fallthrough=fallthrough,
             )
         if mnemonic in exchange_func_call:
@@ -210,7 +211,7 @@ class ArmThumbBackend:
 
     def is_probable_code_address(self, image: FirmwareImage, value: int) -> bool:
         try:
-            image.segment_for(value & ~1)
+            image.segment_for(normalize_interworking_address(value))
         except ValueError:
             return False
         return True

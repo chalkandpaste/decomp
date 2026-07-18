@@ -1,6 +1,7 @@
 import unittest
 
 from decomp.arch.arm_thumb import ArmThumbBackend
+from decomp.arch.arm_thumb.addresses import normalize_interworking_address
 from decomp.arch.arm_thumb.control_flow import (
     is_link_register_restore,
     is_pc_return,
@@ -41,6 +42,10 @@ class ArmThumbControlFlowTests(unittest.TestCase):
         )
 
         self.assertFalse(is_return_to_link_register(instruction))
+
+    def test_normalizes_interworking_addresses(self) -> None:
+        self.assertEqual(normalize_interworking_address(0x08030001), 0x08030000)
+        self.assertEqual(normalize_interworking_address(0x08030000), 0x08030000)
 
 
 if __name__ == "__main__":
