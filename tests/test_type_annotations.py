@@ -37,6 +37,15 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_legacy_records_do_not_expose_old_field_aliases(self) -> None:
+        self.assertEqual(
+            _forbidden_properties(
+                Path("src/decomp/legacy_types.py"),
+                {"block", "children", "end_loc", "index", "loc", "parents"},
+            ),
+            [],
+        )
+
     def test_meta_blocks_use_typed_records(self) -> None:
         violations = []
         for root in (Path("src/decomp"), Path("tests")):
@@ -239,6 +248,24 @@ def _forbidden_methods(path: Path, names: set[str]) -> list[str]:
         for item in node.body:
             if isinstance(item, ast.FunctionDef) and item.name in names:
                 violations.append(f"{path}:{item.lineno} {node.name}.{item.name} is a retired compatibility shim")
+    return violations
+
+
+def _forbidden_properties(path: Path, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for item in node.body:
+            if not isinstance(item, ast.FunctionDef):
+                continue
+            has_property_decorator = any(
+                isinstance(decorator, ast.Name) and decorator.id == "property"
+                for decorator in item.decorator_list
+            )
+            if has_property_decorator and item.name in names:
+                violations.append(f"{path}:{item.lineno} {node.name}.{item.name} is a retired field alias")
     return violations
 
 

@@ -18,26 +18,6 @@ class LegacyBlock:
     predecessors: tuple[int, ...]
     depth: int = 0
 
-    @property
-    def loc(self) -> int:
-        return self.address
-
-    @property
-    def end_loc(self) -> int:
-        return self.end_address
-
-    @property
-    def block(self) -> tuple[LegacyInstruction, ...]:
-        return self.instructions
-
-    @property
-    def children(self) -> tuple[int, ...]:
-        return self.successors
-
-    @property
-    def parents(self) -> tuple[int, ...]:
-        return self.predecessors
-
     def with_instructions(self, instructions: tuple[LegacyInstruction, ...]) -> "LegacyBlock":
         return replace(self, instructions=instructions)
 
@@ -46,10 +26,6 @@ class LegacyBlock:
 class LegacyBlockGraph:
     blocks: LegacyBlockIndex
     entry_address: int
-
-    @property
-    def index(self) -> LegacyBlockIndex:
-        return self.blocks
 
     @property
     def start_block(self) -> LegacyBlock:
