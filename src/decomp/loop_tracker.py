@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import deque
+from collections.abc import Iterable
 from typing import Protocol
 
 
@@ -17,8 +19,8 @@ class LoopTracker:
         self.graph = graph
         self.loc_to_loop_end: dict[int, int | None] = {}
         self.loc_to_loop_start: dict[int, int | None] = {}
-        self.loc_to_loop_locs: dict[int, list[int]] = {}
-        self.not_loop_loc: dict[int, bool] = {} # locs which are not in a loop
+        self.loc_to_loop_locs: dict[int, tuple[int, ...]] = {}
+        self.not_loop_loc: set[int] = set() # locs which are not in a loop
 
     def is_loop_start(self, loc: int) -> bool | None:
         # print('is_loop_start', hex(loc))
@@ -77,21 +79,22 @@ class LoopTracker:
         else:
             return self.detect_loop(loc)
 
-    def branch_intersects(self, reachable: list[int] | set[int], loc: int) -> bool:
+    def branch_intersects(self, reachable: Iterable[int], loc: int) -> bool:
         # print('branch_intersects', [hex(r) for r in reachable], hex(loc))
 
-        search_locs = [loc]
+        reachable_locs = set(reachable)
+        search_locs: deque[int] = deque([loc])
 
-        branch_locs = []
+        branch_locs: list[int] = []
 
-        seen = {}
+        seen: set[int] = set()
 
-        while len(search_locs) > 0:
-            loc = search_locs.pop(0)
+        while search_locs:
+            loc = search_locs.popleft()
 
-            seen[loc] = True
+            seen.add(loc)
 
-            if loc in reachable:
+            if loc in reachable_locs:
                 return True
 
             for c in self.graph.successors(loc):
@@ -102,13 +105,13 @@ class LoopTracker:
         # print('branch_locs', [hex(b) for b in branch_locs])
 
         for b in branch_locs:
-            search_locs = [b]
+            search_locs = deque([b])
 
-            while len(search_locs) > 0:
-                loc = search_locs.pop(0)
-                seen[loc] = True
+            while search_locs:
+                loc = search_locs.popleft()
+                seen.add(loc)
 
-                if loc in reachable:
+                if loc in reachable_locs:
                     return True
 
                 p_locs = self.graph.predecessors(loc)
@@ -136,28 +139,31 @@ class LoopTracker:
         if self._check_loop(start_loc):
             search_locs.append(start_loc)
         else: # if len(loop_locs) == 0:
-            self.not_loop_loc[start_loc] = True
+            self.not_loop_loc.add(start_loc)
             return False
        
         loop_locs, entrance_loc, exit_loc = self._detect_loop_inner(search_locs)
         if entrance_loc is not None and exit_loc is not None:
-            dont_follow = [entrance_loc, exit_loc]
+            dont_follow = (entrance_loc, exit_loc)
             while len(loop_locs) > 0:
                 loop_locs, entrance_loc, exit_loc = self._detect_loop_inner(loop_locs, dont_follow)
-                dont_follow += [entrance_loc, exit_loc]
+                if entrance_loc is not None and exit_loc is not None:
+                    dont_follow += (entrance_loc, exit_loc)
 
         return True
     
-    def _check_loop(self, start_loc: int, dont_follow: list[int] | None = None) -> bool:
+    def _check_loop(self, start_loc: int, dont_follow: Iterable[int] | None = None) -> bool:
         if dont_follow is None:
-            dont_follow = []
+            dont_follow = ()
+        dont_follow = tuple(dont_follow)
+        dont_follow_locs = set(dont_follow)
         print('_check_loop', hex(start_loc), [hex(df) for df in dont_follow])
-        seen = {}
+        seen: set[int] = set()
         search_locs = [start_loc]
 
-        while len(search_locs) > 0:
+        while search_locs:
             loc = search_locs.pop(-1)
-            seen[loc] = True
+            seen.add(loc)
 
             c_locs = [c for c in self.graph.successors(loc)]
 
@@ -165,7 +171,7 @@ class LoopTracker:
                 # only need one counter-example
                 if c == start_loc:
                     return True
-                elif c not in seen and c not in search_locs and c not in dont_follow:
+                elif c not in seen and c not in search_locs and c not in dont_follow_locs:
                     search_locs.append(c)
                 else:
                     pass
@@ -174,28 +180,32 @@ class LoopTracker:
 
     def _detect_loop_inner(
         self,
-        search_locs: list[int],
-        dont_follow: list[int] | None = None,
-    ) -> tuple[list[int], int | None, int | None]:
+        search_locs: Iterable[int],
+        dont_follow: Iterable[int] | None = None,
+    ) -> tuple[tuple[int, ...], int | None, int | None]:
         if dont_follow is None:
-            dont_follow = []
+            dont_follow = ()
+        search_locs = tuple(search_locs)
+        dont_follow = tuple(dont_follow)
+        dont_follow_locs = set(dont_follow)
         print('_detect_loop_inner', [hex(l) for l in search_locs], [hex(df) for df in dont_follow])
-        seen = {}
-        loop_locs = []
+        seen: set[int] = set()
+        loop_locs: list[int] = []
+        pending_locs: deque[int] = deque(search_locs)
 
-        while len(search_locs) > 0:
-            loc = search_locs.pop(0)
-            seen[loc] = True
+        while pending_locs:
+            loc = pending_locs.popleft()
+            seen.add(loc)
 
             if loc not in self.not_loop_loc:
-                if self._check_loop(loc, dont_follow):
-                    if loc not in dont_follow:
+                if self._check_loop(loc, dont_follow_locs):
+                    if loc not in dont_follow_locs:
                         loop_locs.append(loc)
                     for c in self.graph.successors(loc):
-                        if c not in seen and c not in dont_follow and c not in search_locs:
-                            search_locs.append(c)
+                        if c not in seen and c not in dont_follow_locs and c not in pending_locs:
+                            pending_locs.append(c)
                 else:
-                    self.not_loop_loc[loc] = True
+                    self.not_loop_loc.add(loc)
 
             # print('children_locs', [hex(c) for c in self.graph.successors(loc)])
 
@@ -214,16 +224,18 @@ class LoopTracker:
         entrance_loc = None
         exit_loc = None
 
+        loop_loc_set = set(loop_locs)
+
         for loc in loop_locs:
             p_locs = self.graph.predecessors(loc)
             for p in p_locs:
-                if p not in loop_locs:
+                if p not in loop_loc_set:
                     entrance_loc = loc
 
            
             c_locs = self.graph.successors(loc)
             for c in c_locs:
-                if c not in loop_locs:
+                if c not in loop_loc_set:
                     exit_loc = loc
         
         # odd case of being a function end (i.e., loop with no return)
@@ -255,6 +267,6 @@ class LoopTracker:
         for loc in loop_locs:
             self.loc_to_loop_start[loc] = entrance_loc
             self.loc_to_loop_end[loc] = exit_loc
-            self.loc_to_loop_locs[loc] = loop_locs
+            self.loc_to_loop_locs[loc] = tuple(loop_locs)
 
-        return loop_locs, entrance_loc, exit_loc
+        return tuple(loop_locs), entrance_loc, exit_loc

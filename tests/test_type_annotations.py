@@ -227,6 +227,21 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
     def test_structure_uses_fifo_collections_for_fifo_traversal(self) -> None:
         self.assertEqual(_list_pop_zero_calls(Path("src/decomp/structure.py")), [])
 
+    def test_loop_tracker_uses_explicit_membership_and_fifo_collections(self) -> None:
+        path = Path("src/decomp/loop_tracker.py")
+
+        self.assertEqual(_list_pop_zero_calls(path), [])
+        self.assertEqual(
+            _forbidden_attribute_annotations(
+                path,
+                {
+                    "loc_to_loop_locs": {"list"},
+                    "not_loop_loc": {"dict"},
+                },
+            ),
+            [],
+        )
+
     def test_add_function_sigs_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _exact_import_violations(
@@ -1060,6 +1075,37 @@ def _list_pop_zero_calls(path: Path) -> list[str]:
         if isinstance(argument, ast.Constant) and argument.value == 0:
             violations.append(f"{path}:{node.lineno} use deque.popleft() for FIFO traversal")
     return violations
+
+
+def _forbidden_attribute_annotations(path: Path, names_to_forbidden_types: dict[str, set[str]]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.AnnAssign):
+            continue
+        if not isinstance(node.target, ast.Attribute):
+            continue
+        forbidden_types = names_to_forbidden_types.get(node.target.attr)
+        if forbidden_types is None:
+            continue
+        for forbidden_type in forbidden_types:
+            if _annotation_mentions_name(node.annotation, forbidden_type):
+                violations.append(f"{path}:{node.lineno} {node.target.attr} should not use {forbidden_type}")
+    return violations
+
+
+def _annotation_mentions_name(node: ast.AST, name: str) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id == name
+    if isinstance(node, ast.Attribute):
+        return node.attr == name
+    if isinstance(node, ast.Subscript):
+        return _annotation_mentions_name(node.value, name) or _annotation_mentions_name(node.slice, name)
+    if isinstance(node, ast.Tuple):
+        return any(_annotation_mentions_name(element, name) for element in node.elts)
+    if isinstance(node, ast.BinOp):
+        return _annotation_mentions_name(node.left, name) or _annotation_mentions_name(node.right, name)
+    return False
 
 
 def _raw_numeric_subscripts_in_function(path: Path, function_name: str, indexes: set[int]) -> list[str]:
