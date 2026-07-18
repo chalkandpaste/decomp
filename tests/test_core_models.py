@@ -1,9 +1,27 @@
 import unittest
 
+from decomp.arch.arm_thumb import ArmThumbBackend
 from decomp.core.cfg import BasicBlock, ControlFlowGraph
 from decomp.core import EdgeKind, FlowInfo, FlowKind
+from decomp.core.instruction import Instruction
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 from decomp.legacy_adapter import legacy_block_graph_to_cfg
+
+
+class SourceMarkingBackend(ArmThumbBackend):
+    def decode_legacy_tokens(self, tokens: list[object]) -> Instruction:
+        instruction = super().decode_legacy_tokens(tokens)
+        return type(instruction)(
+            address=instruction.address,
+            size=instruction.size,
+            data=instruction.data,
+            mnemonic=instruction.mnemonic,
+            operands=instruction.operands,
+            flow=instruction.flow,
+            raw_tokens=instruction.raw_tokens,
+            legacy_tokens=instruction.legacy_tokens,
+            source="test-backend",
+        )
 
 
 class CoreModelAdapterTests(unittest.TestCase):
@@ -97,6 +115,21 @@ class CoreModelAdapterTests(unittest.TestCase):
         self.assertEqual(cfg.block_at(0x08020000).address, 0x08020000)
         self.assertEqual(cfg.successors(0x08020000), (0x08020008, 0x08020004))
         self.assertEqual(cfg.predecessors(0x08020004), (0x08020000,))
+
+    def test_legacy_block_graph_adapter_accepts_architecture_backend(self) -> None:
+        block = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020002,
+            successors=(),
+            predecessors=(),
+            depth=0,
+            instructions=([b"0x8020000", b"2", b"0000", b"bx", b"lr"],),
+        )
+        graph = LegacyBlockGraph(entry_address=block.address, blocks={block.address: block})
+
+        cfg = legacy_block_graph_to_cfg(graph, backend=SourceMarkingBackend())
+
+        self.assertEqual(cfg.block_at(block.address).instructions[0].source, "test-backend")
 
     def test_control_flow_graph_reachable_order_matches_graph_api(self) -> None:
         block = LegacyBlock(

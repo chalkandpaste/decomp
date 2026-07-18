@@ -354,6 +354,7 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         for path in (
             Path("src/decomp/analysis/cfg_builder.py"),
             Path("src/decomp/analysis/xrefs.py"),
+            Path("src/decomp/legacy_adapter.py"),
         ):
             violations.extend(_import_prefix_violations(path, {"decomp.arch.arm_thumb"}))
 

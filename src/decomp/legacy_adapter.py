@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from decomp.arch.arm_thumb import ArmThumbBackend
+from decomp.arch import ArchitectureBackend, default_architecture_backend
 from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
 from decomp.core.flow import EdgeKind
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 
 
-def legacy_block_graph_to_cfg(block_graph: LegacyBlockGraph, backend: ArmThumbBackend | None = None) -> ControlFlowGraph:
-    backend = backend or ArmThumbBackend()
+def legacy_block_graph_to_cfg(
+    block_graph: LegacyBlockGraph,
+    backend: ArchitectureBackend | None = None,
+) -> ControlFlowGraph:
+    decoder = backend or default_architecture_backend()
     start = block_graph.entry_address
     legacy_blocks = block_graph.block_items()
 
@@ -29,7 +32,7 @@ def legacy_block_graph_to_cfg(block_graph: LegacyBlockGraph, backend: ArmThumbBa
     blocks = {}
     for address, block in legacy_blocks:
         instructions = tuple(
-            backend.decode_legacy_tokens(tokens)
+            decoder.decode_legacy_tokens(tokens)
             for tokens in block.instructions
         )
         blocks[address] = BasicBlock(
