@@ -523,6 +523,25 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_convert_c_simple_renderers_use_named_instruction_accessors(self) -> None:
+        violations = []
+        for function_name in {"div", "mov", "mul", "n_mov", "rev_sub", "sxtab", "vmlas"}:
+            violations.extend(
+                _raw_numeric_subscripts_in_function(
+                    Path("src/decomp/convert_c.py"),
+                    function_name,
+                    {1, 2, 3},
+                )
+            )
+            violations.extend(
+                _negative_subscripts_in_function(
+                    Path("src/decomp/convert_c.py"),
+                    function_name,
+                )
+            )
+
+        self.assertEqual(violations, [])
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
@@ -964,6 +983,29 @@ def _raw_numeric_subscripts_in_function(path: Path, function_name: str, indexes:
             if child.slice.value in indexes:
                 violations.append(f"{path}:{child.lineno} {function_name} should use legacy_instruction accessors")
     return violations
+
+
+def _negative_subscripts_in_function(path: Path, function_name: str) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Subscript):
+                continue
+            if _is_negative_int_constant(child.slice):
+                violations.append(f"{path}:{child.lineno} {function_name} should use named operand helpers")
+    return violations
+
+
+def _is_negative_int_constant(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.UnaryOp)
+        and isinstance(node.op, ast.USub)
+        and isinstance(node.operand, ast.Constant)
+        and isinstance(node.operand.value, int)
+    )
 
 
 def _raw_attribute_subscripts_in_function(path: Path, function_name: str, attribute_names: set[str]) -> list[str]:

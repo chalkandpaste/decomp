@@ -15,6 +15,10 @@ def instruction_operand(instruction: InstructionTokens, index: int) -> bytes:
     return instruction[index + 1]
 
 
+def last_instruction_operands(instruction: InstructionTokens, count: int) -> tuple[bytes, ...]:
+    return tuple(instruction[-count:])
+
+
 def map_sections(sections: list[LegacyLineSection]) -> list[LegacyConvertedSection]:
     new_sections = []
     for section in sections:
@@ -140,10 +144,10 @@ def empty() -> bytes:
     return b''
 
 def mov(i: InstructionTokens) -> bytes:
-    return i[1] + b' = ' + i[2]
+    return instruction_operand(i, 0) + b' = ' + instruction_operand(i, 1)
 
 def n_mov(i: InstructionTokens) -> bytes:
-    return i[1] + b' = ~' + i[2]
+    return instruction_operand(i, 0) + b' = ~' + instruction_operand(i, 1)
 
 def aand(i: InstructionTokens) -> bytes:
     return binop(b' & ', i)
@@ -158,19 +162,25 @@ def sub(i: InstructionTokens) -> bytes:
     return binop(b' - ', i)
 
 def rev_sub(i: InstructionTokens) -> bytes:
-    return i[1] + b' = ' + i[-2] + b' - ' + i[-1]
+    left, right = last_instruction_operands(i, 2)
+    return instruction_operand(i, 0) + b' = ' + left + b' - ' + right
 
 def mul(i: InstructionTokens) -> bytes:
-    return i[1] + b' = ' + i[-2] + b' * ' + i[-1]
+    left, right = last_instruction_operands(i, 2)
+    return instruction_operand(i, 0) + b' = ' + left + b' * ' + right
 
 def smull(i: InstructionTokens) -> bytes:
     return i[2] + b' = ' + i[3] + b' * ' + i[4] + b' & 0xFFFFFFFF00000000 >> 32;\n' + i[1] + b' = (unsigned int) (' + i[3] + b' * ' + i[4] + b' & 0xFFFFFFFF )'
 
 def vmlas(i: InstructionTokens) -> bytes:
-    return i[1] + b' =  (' + i[1] + b' + ' + i[2] + b' * ' + i[3] + b' )'
+    destination = instruction_operand(i, 0)
+    left = instruction_operand(i, 1)
+    right = instruction_operand(i, 2)
+    return destination + b' =  (' + destination + b' + ' + left + b' * ' + right + b' )'
 
 def div(i: InstructionTokens) -> bytes:
-    return i[1] + b' = ' + i[-2] + b' / ' + i[-1]
+    left, right = last_instruction_operands(i, 2)
+    return instruction_operand(i, 0) + b' = ' + left + b' / ' + right
 
 def orr(i: InstructionTokens) -> bytes:
     return binop(b' | ', i)
@@ -204,7 +214,10 @@ def bits(i: InstructionTokens) -> bytes:
 
 
 def sxtab(i: InstructionTokens) -> bytes:
-    return i[1] + b' = ' + i[2] + b' + (int) (char) ' + i[3]
+    destination = instruction_operand(i, 0)
+    addend = instruction_operand(i, 1)
+    extended = instruction_operand(i, 2)
+    return destination + b' = ' + addend + b' + (int) (char) ' + extended
 
 def shift_left(i: InstructionTokens) -> bytes:
     if len(i) == 3:

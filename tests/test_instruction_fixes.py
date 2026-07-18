@@ -125,6 +125,17 @@ class ConvertInstructionTests(unittest.TestCase):
     def test_convert_instruction_dispatches_via_named_mnemonic_accessor(self) -> None:
         self.assertEqual(convert_c.convert_instruction([b"mov", b"r0", b"1"]), b"r0 = 1")
 
+    def test_simple_value_renderers_use_named_operands(self) -> None:
+        self.assertEqual(convert_c.mov([b"mov", b"r0", b"1"]), b"r0 = 1")
+        self.assertEqual(convert_c.n_mov([b"mvn", b"r0", b"r1"]), b"r0 = ~r1")
+        self.assertEqual(convert_c.rev_sub([b"rsb", b"r0", b"r1", b"2"]), b"r0 = r1 - 2")
+        self.assertEqual(convert_c.mul([b"mul", b"r0", b"r1", b"r2"]), b"r0 = r1 * r2")
+        self.assertEqual(convert_c.div([b"sdiv", b"r0", b"r1", b"r2"]), b"r0 = r1 / r2")
+        self.assertEqual(convert_c.sxtab([b"sxtab", b"r0", b"r1", b"r2"]), b"r0 = r1 + (int) (char) r2")
+
+    def test_vmla_renderer_preserves_accumulator_shape(self) -> None:
+        self.assertEqual(convert_c.vmlas([b"vmla.f32", b"s0", b"s1", b"s2"]), b"s0 =  (s0 + s1 * s2 )")
+
     def test_binary_ops_use_two_operand_form(self) -> None:
         self.assertEqual(convert_c.add([b"add", b"r0", b"1"]), b"r0 = r0 + 1")
 
