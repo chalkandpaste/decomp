@@ -183,43 +183,8 @@ def generate_block_graph(
 
     return block_graph
 
-def print_block_graph(block_graph: LegacyBlockGraph) -> bytes:
-    locs = list(block_graph.addresses())
-
-    locs.sort()
-
-    out = []
-
-    for l in locs:
-        block = block_graph.block_at(l).instructions
-        out += block
-
-    out2 = []
-
-    for i in out:
-        insn = []
-        for j in i:
-            if isinstance(j, bytes):
-                insn.append(j)
-            elif isinstance(j, list):
-                j = [bytes(hex(c), 'utf-8') for c in j]
-                insn.append(b', '.join(j))
-        out2.append(b' '.join(insn))
-    
-    return b'\n'.join(out2)
-
-def generate_asm(
-    binary: bytes | None,
-    entry_point_loc: int,
-    cache: bool = True,
-    override: list[LegacyInstruction] | None = None,
-) -> bytes:
-
-    block_graph = generate_block_graph(binary, entry_point_loc, cache, override)
-
-    return print_block_graph(block_graph)
-
 if __name__ == "__main__":
+    from .render_asm import generate_asm
 
     parser = argparse.ArgumentParser('Provide input and output locations')
     parser.add_argument('input_file', metavar='i', type=str, help="input file")

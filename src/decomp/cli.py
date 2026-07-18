@@ -25,12 +25,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     
     args = parser.parse_args(argv)
 
-    from .block_graph import generate_block_graph, generate_asm
+    from .block_graph import generate_block_graph
     from .convert_c import convert
     from .disassemble import generate_func_cf_asm
     from .function_signatures import collect_functions, skip_functions
     from .liveness import liveness
     from .reduce_c import reduce_c
+    from .render_asm import generate_asm
     
     output_dir = Path(args.output_dir)
     cf_dir = output_dir / 'cf'

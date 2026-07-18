@@ -70,6 +70,15 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_assembly_rendering_stays_out_of_block_graph_module(self) -> None:
+        self.assertEqual(
+            _forbidden_defs(
+                Path("src/decomp/block_graph.py"),
+                {"generate_asm", "print_block_graph", "render_block_graph_asm"},
+            ),
+            [],
+        )
+
     def test_graph_driven_modules_do_not_index_raw_block_maps(self) -> None:
         violations = []
         for path in (
