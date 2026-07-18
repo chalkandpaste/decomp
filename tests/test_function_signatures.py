@@ -23,6 +23,11 @@ class NoRegisterEffectBehavior(ArmThumbArchitectureBehavior):
         return None
 
 
+class IdentityAddressBehavior(ArmThumbArchitectureBehavior):
+    def normalize_code_address(self, address: int) -> int:
+        return address
+
+
 class FunctionSignatureTests(unittest.TestCase):
     def test_add_function_sigs_uses_reachable_graph_order(self) -> None:
         entry = LegacyBlock(
@@ -74,6 +79,26 @@ class FunctionSignatureTests(unittest.TestCase):
         self.assertEqual(updated.block_at(reachable.address).instructions[0][-1], b"; int func_0x8040000()")
         self.assertEqual(updated.block_at(unreachable.address).instructions, unreachable.instructions)
         self.assertEqual(graph.block_at(entry.address).instructions, entry.instructions)
+
+    def test_add_function_sigs_accepts_architecture_behavior(self) -> None:
+        entry = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020004,
+            successors=(),
+            predecessors=(),
+            instructions=(
+                [b"0x8020000", b"4", b"00000000", b"b.w", b"0x8030001"],
+            ),
+        )
+        graph = LegacyBlockGraph(entry_address=entry.address, blocks={entry.address: entry})
+
+        updated = add_function_sigs(
+            graph,
+            {0x08030001: b"; odd target behavior"},
+            behavior=IdentityAddressBehavior(),
+        )
+
+        self.assertEqual(updated.block_at(entry.address).instructions[0][-1], b"; odd target behavior")
 
     def test_detects_integer_return_register_write(self) -> None:
         graph = _single_block_graph(

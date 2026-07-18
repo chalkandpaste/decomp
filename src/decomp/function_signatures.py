@@ -7,11 +7,10 @@ from .arch import ArchitectureBehavior, RegisterEffect, default_architecture_beh
 from .core.cfg import ControlFlowGraph
 from .core.instruction import Instruction
 from .legacy_adapter import legacy_block_graph_to_cfg
-from .legacy_instruction import mnemonic, operand_int, with_appended_token
+from .legacy_instruction import instruction_address, with_appended_token
 from .legacy_types import LegacyBlockGraph, LegacyRegisterScope
 
 from .loop_tracker import LoopTracker
-from .instructions import func_call, uncond_block_end
     
 skip_functions = [ 134469972, 134471256, 134469472, 134471424, 134472782, 134455624, 134470750, 134472518,
             0x8020298, 0x80205d6, 0x802fe84, 0x8020ccc, 0x8020334, 0x8020f24, 0x8020c40, 0x8021470, 0x8021340,
@@ -115,26 +114,58 @@ class FunctionDeclaration:
         return b'; ' + self.render()
 
 
-def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, bytes]) -> LegacyBlockGraph:
+def add_function_sigs(
+    block_graph: LegacyBlockGraph,
+    function_sigs: dict[int, bytes],
+    behavior: ArchitectureBehavior | None = None,
+) -> LegacyBlockGraph:
+    architecture = behavior or default_architecture_behavior()
+    cfg = legacy_block_graph_to_cfg(block_graph)
+    comments = _function_signature_comments(cfg, function_sigs, architecture)
+
     for loc in block_graph.reachable_order(direction=False):
         block = block_graph.block_at(loc)
         insns = block.instructions
 
         new_insns = []
 
-        for i in range(len(insns)):
-            insn = insns[i]
-            insn_mnemonic = mnemonic(insn)
-            if insn_mnemonic in func_call or insn_mnemonic in uncond_block_end:
-                func_loc = operand_int(insn, 0)
-                if func_loc in function_sigs:
-                    fs = function_sigs[func_loc]
-                    insn = with_appended_token(insn, fs)
+        for insn in insns:
+            comment = comments.get(instruction_address(insn))
+            if comment is not None:
+                insn = with_appended_token(insn, comment)
 
             new_insns.append(insn)
         block_graph = block_graph.with_block(block.with_instructions(tuple(new_insns)))
 
     return block_graph
+
+
+def _function_signature_comments(
+    cfg: ControlFlowGraph,
+    function_sigs: dict[int, bytes],
+    behavior: ArchitectureBehavior,
+) -> dict[int, bytes]:
+    comments = {}
+    for address in cfg.reachable_order(direction=False):
+        block = cfg.block_at(address)
+        for instruction in block.instructions:
+            comment = _function_signature_comment(instruction, function_sigs, behavior)
+            if comment is not None:
+                comments[instruction.address] = comment
+    return comments
+
+
+def _function_signature_comment(
+    instruction: Instruction,
+    function_sigs: dict[int, bytes],
+    behavior: ArchitectureBehavior,
+) -> bytes | None:
+    if not instruction.flow.is_direct_call() and not instruction.flow.is_unconditional_branch():
+        return None
+    for target in instruction.flow.target_addresses(behavior.normalize_code_address):
+        if target in function_sigs:
+            return function_sigs[target]
+    return None
 
 def collect_functions(
     block_graph: LegacyBlockGraph,

@@ -208,6 +208,13 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
     def test_add_function_sigs_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
+            _exact_import_violations(
+                Path("src/decomp/function_signatures.py"),
+                {"decomp.instructions"},
+            ),
+            [],
+        )
+        self.assertEqual(
             _raw_numeric_subscripts_in_function(
                 Path("src/decomp/function_signatures.py"),
                 "add_function_sigs",
@@ -220,6 +227,14 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
                 Path("src/decomp/function_signatures.py"),
                 "add_function_sigs",
                 {"successors"},
+            ),
+            [],
+        )
+        self.assertEqual(
+            _function_call_violations(
+                Path("src/decomp/function_signatures.py"),
+                "add_function_sigs",
+                {"mnemonic", "operand_int"},
             ),
             [],
         )
