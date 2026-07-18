@@ -5,16 +5,13 @@ from typing import Protocol
 
 from decomp.arch.arm_thumb import ArmThumbBackend
 from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
-from decomp.core.flow import EdgeKind
+from decomp.core.flow import EdgeKind, FlowKind
 from decomp.core.instruction import Instruction
 from decomp.instruction_buffer import InstructionsBuffer
 from decomp.instructions import (
     block_end,
-    cond_block_end,
-    cond_block_end_zero,
     exchange_return,
     func_end,
-    tbb,
     uncond_block_end,
 )
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph, LegacyBlockIndex, LegacyInstruction
@@ -163,26 +160,23 @@ def _collect_block_instructions(instructions: tuple[Instruction, ...]) -> tuple[
 
 def _children_for_block(instructions: list[Instruction]) -> list[int]:
     last = instructions[-1]
-    tokens = _legacy_tokens(last)
-    mnemonic = _mnemonic(last)
+    flow = last.flow
 
-    if mnemonic in cond_block_end:
-        jump_loc = int(tokens[4], 0)
-        next_block_loc = last.address + last.size
-        return [jump_loc, next_block_loc]
+    if flow.kind == FlowKind.CONDITIONAL_BRANCH:
+        if len(flow.targets) != 1 or flow.fallthrough is None:
+            raise ValueError(f"conditional branch at {hex(last.address)} lacks typed target information")
+        return [flow.targets[0], flow.fallthrough]
 
-    if mnemonic in cond_block_end_zero:
-        jump_loc = int(tokens[5], 0)
-        next_block_loc = last.address + last.size
-        return [jump_loc, next_block_loc]
+    if flow.kind == FlowKind.UNCONDITIONAL_BRANCH:
+        return list(flow.targets)
 
-    if mnemonic in uncond_block_end:
-        return [int(tokens[4], 0)]
+    if flow.kind == FlowKind.SWITCH:
+        return list(flow.targets)
 
-    if mnemonic in tbb:
-        return list(tokens[-1])
+    if flow.is_function_exit:
+        return []
 
-    return [last.address + last.size]
+    return [flow.fallthrough if flow.fallthrough is not None else last.address + last.size]
 
 
 def _with_outgoing_edges(block: BasicBlock, children: list[int]) -> BasicBlock:

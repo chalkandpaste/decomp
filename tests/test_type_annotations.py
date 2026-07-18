@@ -132,6 +132,42 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_cfg_child_discovery_uses_typed_flow_info(self) -> None:
+        self.assertEqual(
+            _function_call_violations(
+                Path("src/decomp/analysis/cfg_builder.py"),
+                "_children_for_block",
+                {"_legacy_tokens"},
+            ),
+            [],
+        )
+
+    def test_xrefs_use_typed_flow_and_operands(self) -> None:
+        self.assertEqual(
+            _function_call_violations(
+                Path("src/decomp/analysis/xrefs.py"),
+                "_collect_block_references",
+                {"_legacy_tokens"},
+            ),
+            [],
+        )
+        self.assertEqual(
+            _function_call_violations(
+                Path("src/decomp/analysis/xrefs.py"),
+                "_tail_branches_after_restore",
+                {"_legacy_tokens"},
+            ),
+            [],
+        )
+        self.assertEqual(
+            _function_call_violations(
+                Path("src/decomp/analysis/xrefs.py"),
+                "_literal_loaded_into_register",
+                {"_legacy_tokens"},
+            ),
+            [],
+        )
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
@@ -352,6 +388,29 @@ def _raw_numeric_subscripts_in_function(path: Path, function_name: str, indexes:
             if child.slice.value in indexes:
                 violations.append(f"{path}:{child.lineno} {function_name} should use legacy_instruction accessors")
     return violations
+
+
+def _function_call_violations(path: Path, function_name: str, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Call):
+                continue
+            name = _call_name(child.func)
+            if name in names:
+                violations.append(f"{path}:{child.lineno} {function_name} should not call {name}")
+    return violations
+
+
+def _call_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
 
 
 def _subscript_root_name(node: ast.AST) -> str | None:

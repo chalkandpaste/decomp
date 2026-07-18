@@ -69,6 +69,17 @@ class ArmThumbBackendDecodeTests(unittest.TestCase):
         self.assertEqual(instruction.flow.kind, FlowKind.CONDITIONAL_BRANCH)
         self.assertEqual(instruction.flow.targets, (0x08020008,))
 
+    def test_typed_instruction_exposes_operand_helpers(self) -> None:
+        backend = ArmThumbBackend()
+
+        instruction = backend.decode_legacy_tokens(
+            [b"0x8020000", b"2", b"0000", b"mov", b"r0,", b"0x8034f49"]
+        )
+
+        self.assertEqual(instruction.operand_register(0), "r0")
+        self.assertEqual(instruction.operand_int(1), 0x08034F49)
+        self.assertIsNone(instruction.operand_at(2))
+
     def test_backend_normalizes_branch_targets_against_decode_window(self) -> None:
         class FakeBackend(ArmThumbBackend):
             def disassemble_section(self, _section_bytes: bytes) -> bytes:
