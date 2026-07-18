@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .block_graph import generate_block_graph
-from .function_signatures import RegisterSignature, collect_functions, get_function_signature, skip_functions
+from .function_signatures import (
+    RegisterSignature,
+    collect_functions,
+    get_function_signature,
+    render_function_declaration,
+    skip_functions,
+)
 from .legacy_types import LegacyBlockGraph
 
 
@@ -61,40 +67,6 @@ def generate_func_sigs(binary: bytes, entry_point_loc: int) -> dict[int, bytes]:
 
     for f in func_signatures:
         signature = func_signatures[f]
-        if signature.argument_scope[b'r3']:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( int r0, int r1, int r2, int r3 )'
-        elif signature.argument_scope[b'r2']:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( int r0, int r1, int r2 )'
-        elif signature.argument_scope[b'r1']:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( int r0, int r1 )'
-        elif signature.argument_scope[b'r0']:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( int r0 )'
-        elif signature.argument_scope[b's3']:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( float s0, float s1, float s2, float s3 )'
-        elif signature.argument_scope[b's2']:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( float s0, float s1, float s2 )'
-        elif signature.argument_scope[b's1']:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b'  ( float s0, float s1 )'
-        elif signature.argument_scope[b's0']:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( float s0 )'
-        elif signature.argument_scope[b'd1']:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( double d0, double d1 )'
-        elif signature.argument_scope[b'd0']:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( double d0 )'
-        else:
-            args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ()'
-
-        if signature.return_scope[b'r1']:
-            return_type = b'long '
-        elif signature.return_scope[b'r0']:
-            return_type = b'int '
-        elif signature.return_scope[b's0']:
-            return_type = b'float '
-        elif signature.return_scope[b'd0']:
-            return_type = b'double '
-        else:
-            return_type = b'void '
-
-        func_comments[f] = b'; ' + return_type + args_type
+        func_comments[f] = render_function_declaration(signature, f).render_comment()
 
     return func_comments

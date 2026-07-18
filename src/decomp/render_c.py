@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .function_signatures import get_function_signature
+from .function_signatures import get_function_signature, render_function_declaration
 from .instructions import (
     beq,
     bge,
@@ -307,41 +307,7 @@ def generate_func_decl(block_graph: LegacyBlockGraph) -> bytes:
 
 
     signature = get_function_signature(block_graph)
-    if signature.argument_scope[b'r3']:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b' ( int r0, int r1, int r2, int r3 )'
-    elif signature.argument_scope[b'r2']:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b' ( int r0, int r1, int r2 )'
-    elif signature.argument_scope[b'r1']:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b' ( int r0, int r1 )'
-    elif signature.argument_scope[b'r0']:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b' ( int r0 )'
-    elif signature.argument_scope[b's3']:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b' ( float s0, float s1, float s2, float s3 )'
-    elif signature.argument_scope[b's2']:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b' ( float s0, float s1, float s2 )'
-    elif signature.argument_scope[b's1']:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b'  ( float s0, float s1 )'
-    elif signature.argument_scope[b's0']:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b' ( float s0 )'
-    elif signature.argument_scope[b'd1']:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b' ( double d0, double d1 )'
-    elif signature.argument_scope[b'd0']:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b' ( double d0 )'
-    else:
-        args_type = b'func_' + bytes(hex(start), 'utf-8') + b' ()'
-
-    if signature.return_scope[b'r1']:
-        return_type = b'long '
-    elif signature.return_scope[b'r0']:
-        return_type = b'int '
-    elif signature.return_scope[b's0']:
-        return_type = b'float '
-    elif signature.return_scope[b'd0']:
-        return_type = b'double '
-    else:
-        return_type = b'void '
-
-    return return_type + args_type
+    return render_function_declaration(signature, start).render()
 
 
 def _operand_without_trailing_comma(instruction: LegacyInstruction, index: int) -> bytes:

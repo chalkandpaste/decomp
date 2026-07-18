@@ -44,6 +44,18 @@ class RegisterSignature:
     argument_scope: LegacyRegisterScope
 
 
+@dataclass(frozen=True)
+class FunctionDeclaration:
+    return_type: bytes
+    prototype: bytes
+
+    def render(self) -> bytes:
+        return self.return_type + self.prototype
+
+    def render_comment(self) -> bytes:
+        return b'; ' + self.render()
+
+
 def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, bytes]) -> LegacyBlockGraph:
     for loc in block_graph.reachable_order(direction=False):
         block = block_graph.block_at(loc)
@@ -76,6 +88,46 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> RegisterSignature:
     cfg = legacy_block_graph_to_cfg(block_graph)
     loop_tracker = LoopTracker(cfg)
     return _get_function_signature_from_cfg(cfg, loop_tracker)
+
+
+def render_function_declaration(signature: RegisterSignature, address: int) -> FunctionDeclaration:
+    function_name = b'func_' + bytes(hex(address), 'utf-8')
+
+    if signature.argument_scope[b'r3']:
+        prototype = function_name + b' ( int r0, int r1, int r2, int r3 )'
+    elif signature.argument_scope[b'r2']:
+        prototype = function_name + b' ( int r0, int r1, int r2 )'
+    elif signature.argument_scope[b'r1']:
+        prototype = function_name + b' ( int r0, int r1 )'
+    elif signature.argument_scope[b'r0']:
+        prototype = function_name + b' ( int r0 )'
+    elif signature.argument_scope[b's3']:
+        prototype = function_name + b' ( float s0, float s1, float s2, float s3 )'
+    elif signature.argument_scope[b's2']:
+        prototype = function_name + b' ( float s0, float s1, float s2 )'
+    elif signature.argument_scope[b's1']:
+        prototype = function_name + b'  ( float s0, float s1 )'
+    elif signature.argument_scope[b's0']:
+        prototype = function_name + b' ( float s0 )'
+    elif signature.argument_scope[b'd1']:
+        prototype = function_name + b' ( double d0, double d1 )'
+    elif signature.argument_scope[b'd0']:
+        prototype = function_name + b' ( double d0 )'
+    else:
+        prototype = function_name + b' ()'
+
+    if signature.return_scope[b'r1']:
+        return_type = b'long '
+    elif signature.return_scope[b'r0']:
+        return_type = b'int '
+    elif signature.return_scope[b's0']:
+        return_type = b'float '
+    elif signature.return_scope[b'd0']:
+        return_type = b'double '
+    else:
+        return_type = b'void '
+
+    return FunctionDeclaration(return_type=return_type, prototype=prototype)
 
 
 def _get_function_signature_from_cfg(

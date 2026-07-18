@@ -218,6 +218,24 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_signature_callers_use_shared_declaration_renderer(self) -> None:
+        self.assertEqual(
+            _attribute_access_violations(
+                Path("src/decomp/render_c.py"),
+                "signature",
+                {"argument_scope", "return_scope"},
+            ),
+            [],
+        )
+        self.assertEqual(
+            _attribute_access_violations(
+                Path("src/decomp/function_discovery.py"),
+                "signature",
+                {"argument_scope", "return_scope"},
+            ),
+            [],
+        )
+
     def test_typed_function_signature_traversal_stays_off_legacy_decode(self) -> None:
         self.assertEqual(
             _function_call_violations(

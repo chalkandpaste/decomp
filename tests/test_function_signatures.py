@@ -2,7 +2,13 @@ import contextlib
 import io
 import unittest
 
-from decomp.function_signatures import RegisterSignature, add_function_sigs, get_function_signature
+from decomp.function_signatures import (
+    FunctionDeclaration,
+    RegisterSignature,
+    add_function_sigs,
+    get_function_signature,
+    render_function_declaration,
+)
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 
 
@@ -133,6 +139,18 @@ class FunctionSignatureTests(unittest.TestCase):
         self.assertTrue(signature.argument_scope[b"r2"])
         self.assertTrue(signature.argument_scope[b"r3"])
 
+    def test_render_function_declaration_returns_named_record(self) -> None:
+        signature = RegisterSignature(
+            return_scope=_scope((b"r0",)),
+            argument_scope=_scope((b"r0", b"r1")),
+        )
+
+        declaration = render_function_declaration(signature, 0x08034F48)
+
+        self.assertIsInstance(declaration, FunctionDeclaration)
+        self.assertEqual(declaration.render(), b"int func_0x8034f48 ( int r0, int r1 )")
+        self.assertEqual(declaration.render_comment(), b"; int func_0x8034f48 ( int r0, int r1 )")
+
 
 def _single_block_graph(instructions: list[list[object]]) -> LegacyBlockGraph:
     block = LegacyBlock(
@@ -148,6 +166,24 @@ def _single_block_graph(instructions: list[list[object]]) -> LegacyBlockGraph:
 def _quiet_signature(block_graph: LegacyBlockGraph) -> RegisterSignature:
     with contextlib.redirect_stdout(io.StringIO()):
         return get_function_signature(block_graph)
+
+
+def _scope(enabled_registers: tuple[bytes, ...]) -> dict[bytes, bool]:
+    registers = (
+        b"r0",
+        b"r1",
+        b"r2",
+        b"r3",
+        b"s0",
+        b"s1",
+        b"s2",
+        b"s3",
+        b"d0",
+        b"d1",
+        b"d2",
+        b"d3",
+    )
+    return {register: register in enabled_registers for register in registers}
 
 
 if __name__ == "__main__":
