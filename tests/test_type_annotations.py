@@ -128,6 +128,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_graph_driven_modules_use_graph_relationship_methods(self) -> None:
+        violations = []
+        for path in (
+            Path("src/decomp/block_graph.py"),
+            Path("src/decomp/structure.py"),
+        ):
+            violations.extend(_legacy_block_relationship_field_access(path))
+
+        self.assertEqual(violations, [])
+
     def test_meta_block_graph_construction_uses_source_blocks_name(self) -> None:
         violations = []
         for root in (Path("src/decomp"), Path("tests")):
@@ -487,6 +497,19 @@ def _raw_graph_storage_access(path: Path) -> list[str]:
     return violations
 
 
+def _legacy_block_relationship_field_access(path: Path) -> list[str]:
+    relationship_fields = {"successors", "predecessors"}
+    block_names = {"block", "child", "children", "curr_block"}
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute) or node.attr not in relationship_fields:
+            continue
+        if _attribute_root_name(node.value) in block_names:
+            violations.append(f"{path}:{node.lineno} use graph.{node.attr}(address)")
+    return violations
+
+
 def _legacy_meta_block_graph_constructor_keywords(path: Path) -> list[str]:
     violations = []
     tree = ast.parse(path.read_text(), filename=str(path))
@@ -579,6 +602,12 @@ def _subscript_root_name(node: ast.AST) -> str | None:
     if isinstance(node, ast.Name):
         return node.id
     return None
+
+
+def _attribute_root_name(node: ast.AST) -> str | None:
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    return _subscript_root_name(node)
 
 
 def _function_arguments(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.arg]:

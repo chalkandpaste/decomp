@@ -29,28 +29,8 @@ def recurse_blocks(
 
     out = base_case
 
-    retrace_nodes = [block_graph.block_at(start_address)]
-
-    # mark them false as we proceed through, faster than lists
-    tally = { i : True for i in block_graph.addresses() }
-
-    direction = -1 if direction else 0
-
-    while len(retrace_nodes) > 0:
-        curr_block = retrace_nodes.pop(direction)
-        children = [block_graph.block_at(i) for i in curr_block.successors]
-
-        tally[curr_block.address] = False # visited
-
-        # do thing
-        out = f(curr_block, block_graph, out)
-
-    
-        # get it ready for the next iteration
-
-        for c in children:
-            if tally[c.address]: # if it hasn't been visited
-                retrace_nodes.append(c) # push
+    for address in block_graph.reachable_order(start_address, direction=direction):
+        out = f(block_graph.block_at(address), block_graph, out)
 
     return out
 

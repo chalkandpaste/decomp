@@ -30,6 +30,9 @@ class LegacyBlockGraph:
     def block_at(self, address: int) -> LegacyBlock:
         return self.blocks[address]
 
+    def has_block(self, address: int) -> bool:
+        return address in self.blocks
+
     def addresses(self) -> tuple[int, ...]:
         return tuple(self.blocks.keys())
 
@@ -47,23 +50,33 @@ class LegacyBlockGraph:
         blocks[block.address] = block
         return replace(self, blocks=blocks)
 
-    def reachable_order(self) -> list[int]:
-        retrace_nodes = [self.entry_address]
+    def reachable_order(
+        self,
+        start_address: int | None = None,
+        direction: bool = True,
+        stop_address: int | None = None,
+    ) -> tuple[int, ...]:
+        start = self.entry_address if start_address is None else start_address
+        pop_index = -1 if direction else 0
+        retrace_nodes = [start]
+        pending = {start}
         seen: set[int] = set()
         order = []
 
         while retrace_nodes:
-            address = retrace_nodes.pop()
-            if address in seen or address not in self.blocks:
+            address = retrace_nodes.pop(pop_index)
+            pending.remove(address)
+            if address in seen or not self.has_block(address):
                 continue
             seen.add(address)
             order.append(address)
 
             for child in self.successors(address):
-                if child not in seen:
+                if child != stop_address and child not in seen and child not in pending:
                     retrace_nodes.append(child)
+                    pending.add(child)
 
-        return order
+        return tuple(order)
 
 
 @dataclass(frozen=True)

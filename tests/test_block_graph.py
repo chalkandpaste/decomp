@@ -67,6 +67,58 @@ class BlockGraphTests(unittest.TestCase):
 
         self.assertEqual(seen_addresses, [0x08020000, 0x08020004])
 
+    def test_reachable_order_supports_start_direction_and_stop_address(self) -> None:
+        entry = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020002,
+            instructions=(),
+            successors=(0x08020002, 0x08020004),
+            predecessors=(),
+        )
+        left = LegacyBlock(
+            address=0x08020002,
+            end_address=0x08020004,
+            instructions=(),
+            successors=(0x08020006,),
+            predecessors=(entry.address,),
+        )
+        right = LegacyBlock(
+            address=0x08020004,
+            end_address=0x08020006,
+            instructions=(),
+            successors=(0x08020006,),
+            predecessors=(entry.address,),
+        )
+        exit_block = LegacyBlock(
+            address=0x08020006,
+            end_address=0x08020008,
+            instructions=(),
+            successors=(),
+            predecessors=(left.address, right.address),
+        )
+        graph = LegacyBlockGraph(
+            blocks={
+                entry.address: entry,
+                left.address: left,
+                right.address: right,
+                exit_block.address: exit_block,
+            },
+            entry_address=entry.address,
+        )
+
+        self.assertEqual(
+            graph.reachable_order(direction=True),
+            (entry.address, right.address, exit_block.address, left.address),
+        )
+        self.assertEqual(
+            graph.reachable_order(direction=False),
+            (entry.address, left.address, right.address, exit_block.address),
+        )
+        self.assertEqual(
+            graph.reachable_order(left.address, stop_address=exit_block.address),
+            (left.address,),
+        )
+
     def test_unconditional_branch_has_single_jump_child(self) -> None:
         insns = [
             [b"0x8020000", b"2", b"0000", b"b", b"0x8020008"],

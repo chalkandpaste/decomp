@@ -14,6 +14,7 @@ from .meta_blocks import (
 
 
 class MetaBlockFinder(LoopTracker):
+    graph: LegacyBlockGraph
 
     def __init__(self, graph: LegacyBlockGraph) -> None:
         super().__init__(graph)
@@ -24,29 +25,15 @@ class MetaBlockFinder(LoopTracker):
         if len(reachable) == 0:
             return False
         for loc in reachable:
-            block = self.graph.block_at(loc)
-            
-            retrace_nodes = [block]
-            tally = { }
-    
-            visited = []
-
-            while len(retrace_nodes) > 0:
-                block = retrace_nodes.pop(-1)
-                children = [self.graph.block_at(i) for i in block.successors]
-
-                tally[block.address] = True
-                visited.append(block.address)
+            for address in self.graph.reachable_order(loc, stop_address=end_loc):
+                children_locs = self.graph.successors(address)
                 
-                if block.address not in reachable and (not len(children) == 0 or not self.branch_intersects(reachable, block.address)):
+                if address not in reachable and (
+                    len(children_locs) != 0
+                    or not self.branch_intersects(reachable, address)
+                ):
                     # print("non-reachable", hex(block.address))
                     return False
-
-                for c in children:
-                    if c.address not in tally and c not in retrace_nodes and c.address != end_loc:
-                        retrace_nodes.append(c) # push
-
-            # print("visited", [hex(v) for v in visited])
 
         return True
 
@@ -188,21 +175,23 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
         preface = []
 
         children_locs = block_graph.successors(start_loc)
-        children = [block_graph.block_at(c) for c in children_locs]
 
         # print("pre-eating", hex(start_loc))
-        while len(children) == 1 and len(children[0].predecessors) == 1 and children_locs[0] != end_loc:
+        while (
+            len(children_locs) == 1
+            and len(block_graph.predecessors(children_locs[0])) == 1
+            and children_locs[0] != end_loc
+        ):
             preface.append(start_loc)
             start_loc = children_locs[0]
             # print("eating", hex(start_loc))
             seen_locs[start_loc] = True
             children_locs = block_graph.successors(start_loc)
-            children = [block_graph.block_at(c) for c in children_locs]
 
         preface.append(start_loc)
         seen_locs[start_loc] = True
 
-        if len(children) == 2:
+        if len(children_locs) == 2:
             have_not_made_meta_block = meta_block_loc not in meta_block_index
             # print('have not made', have_not_made_meta_block)
             is_loop = mbf.is_loop_start(meta_block_loc)
@@ -325,7 +314,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                                 )
                 else:
                     pass
-        elif len(children) > 2:
+        elif len(children_locs) > 2:
             # print('making tbb node', hex(meta_block_loc))
 
             for c in children_locs:
@@ -339,7 +328,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                     next_address=end_loc,
                     )
 
-        elif len(children) == 1:
+        elif len(children_locs) == 1:
             print("making block node", hex(meta_block_loc))
 
             blocks = preface
@@ -392,7 +381,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                         )
             
 
-        elif len(children) == 0:
+        elif len(children_locs) == 0:
            # print('making end_node')
             meta_block_index[meta_block_loc] = EndBlock(
                         address=meta_block_loc,
