@@ -112,6 +112,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_add_function_sigs_uses_legacy_instruction_accessors(self) -> None:
+        self.assertEqual(
+            _raw_numeric_subscripts_in_function(
+                Path("src/decomp/function_signatures.py"),
+                "add_function_sigs",
+                {3, 4},
+            ),
+            [],
+        )
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
@@ -315,6 +325,22 @@ def _legacy_meta_block_graph_block_index_access(path: Path) -> list[str]:
             continue
         if node.attr == "block_index":
             violations.append(f"{path}:{node.lineno} use MetaBlockGraph.source_blocks")
+    return violations
+
+
+def _raw_numeric_subscripts_in_function(path: Path, function_name: str, indexes: set[int]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Subscript):
+                continue
+            if not isinstance(child.slice, ast.Constant) or not isinstance(child.slice.value, int):
+                continue
+            if child.slice.value in indexes:
+                violations.append(f"{path}:{child.lineno} {function_name} should use legacy_instruction accessors")
     return violations
 
 

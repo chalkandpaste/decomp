@@ -1,6 +1,7 @@
 from .block_graph import generate_block_graph
 from .analysis import collect_function_addresses
 from .legacy_adapter import legacy_block_graph_to_cfg
+from .legacy_instruction import mnemonic, operand_int, with_appended_token
 from .legacy_types import LegacyBlockGraph, LegacyRegisterScope
 
 from .loop_tracker import LoopTracker
@@ -32,11 +33,12 @@ def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, by
 
         for i in range(len(insns)):
             insn = insns[i]
-            if insn[3] in func_call or insn[3] in uncond_block_end:
-                func_loc = int(insn[4], 0)
+            insn_mnemonic = mnemonic(insn)
+            if insn_mnemonic in func_call or insn_mnemonic in uncond_block_end:
+                func_loc = operand_int(insn, 0)
                 if func_loc in function_sigs:
                     fs = function_sigs[func_loc]
-                    insn = [*insn, fs]
+                    insn = with_appended_token(insn, fs)
 
             new_insns.append(insn)
         block_graph = block_graph.with_block(block.with_instructions(tuple(new_insns)))
