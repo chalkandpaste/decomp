@@ -125,6 +125,18 @@ class ConvertInstructionTests(unittest.TestCase):
     def test_convert_instruction_dispatches_via_named_mnemonic_accessor(self) -> None:
         self.assertEqual(convert_c.convert_instruction([b"mov", b"r0", b"1"]), b"r0 = 1")
 
+    def test_binary_ops_use_two_operand_form(self) -> None:
+        self.assertEqual(convert_c.add([b"add", b"r0", b"1"]), b"r0 = r0 + 1")
+
+    def test_binary_ops_use_three_operand_form(self) -> None:
+        self.assertEqual(convert_c.sub([b"sub", b"r0", b"r1", b"2"]), b"r0 = r1 - 2")
+
+    def test_binary_ops_use_shifted_operand_form(self) -> None:
+        self.assertEqual(
+            convert_c.orr([b"orr", b"r0", b"r1", b"r2", b"lsl", b"3"]),
+            b"r0 = r1 | (r2 << 3)",
+        )
+
     def test_three_operand_left_shift_lowers_as_left_shift(self) -> None:
         self.assertEqual(
             convert_c.shift_left([b"lsls", b"r0", b"2"]),

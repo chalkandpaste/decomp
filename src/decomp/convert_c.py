@@ -11,6 +11,10 @@ def instruction_mnemonic(instruction: InstructionTokens) -> bytes:
     return instruction[0]
 
 
+def instruction_operand(instruction: InstructionTokens, index: int) -> bytes:
+    return instruction[index + 1]
+
+
 def map_sections(sections: list[LegacyLineSection]) -> list[LegacyConvertedSection]:
     new_sections = []
     for section in sections:
@@ -105,19 +109,32 @@ def convert_instruction(insn: InstructionTokens) -> bytes:
 
 
 def binop(sign: bytes, i: InstructionTokens) -> bytes:
+    mnemonic = instruction_mnemonic(i)
+    destination = instruction_operand(i, 0)
     if len(i) == 3:
-        return (i[1] + b' = ' + i[1] + sign + i[2])
-    elif len(i) == 4 or (i[0] == b'add' and len(i) == 8): # special case for dumb comments
-        return (i[1] + b' = ' + i[2] + sign + i[3])
+        return (destination + b' = ' + destination + sign + instruction_operand(i, 1))
+    elif len(i) == 4 or (mnemonic == b'add' and len(i) == 8): # special case for dumb comments
+        return (destination + b' = ' + instruction_operand(i, 1) + sign + instruction_operand(i, 2))
     else:
-        if i[4] == b'asr' or i[4] == b'lsr':
+        shift_kind = instruction_operand(i, 3)
+        if shift_kind == b'asr' or shift_kind == b'lsr':
             shift = b' >> '
-        elif i[4] == b'lsl' or i[4] == b'asl':
+        elif shift_kind == b'lsl' or shift_kind == b'asl':
             shift = b' << '
         else:
             print(i)
             raise Exception
-        return (i[1] + b' = ' + i[2] + sign + b'(' + i[3] + shift + i[5] + b')')
+        return (
+            destination +
+            b' = ' +
+            instruction_operand(i, 1) +
+            sign +
+            b'(' +
+            instruction_operand(i, 2) +
+            shift +
+            instruction_operand(i, 4) +
+            b')'
+        )
 
 def empty() -> bytes:
     return b''

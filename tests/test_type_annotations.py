@@ -513,6 +513,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_convert_c_binary_ops_use_named_instruction_accessors(self) -> None:
+        self.assertEqual(
+            _raw_numeric_subscripts_in_function(
+                Path("src/decomp/convert_c.py"),
+                "binop",
+                {0, 1, 2, 3, 4, 5},
+            ),
+            [],
+        )
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
