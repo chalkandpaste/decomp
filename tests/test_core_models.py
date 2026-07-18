@@ -48,11 +48,11 @@ class CoreModelAdapterTests(unittest.TestCase):
 
         self.assertEqual(cfg.entry, 0x08020000)
         self.assertEqual(cfg.block_starts(), (0x08020000, 0x08020004, 0x08020008))
-        self.assertEqual(cfg.blocks[0x08020000].outgoing[0].kind, EdgeKind.TRUE_BRANCH)
-        self.assertEqual(cfg.blocks[0x08020000].outgoing[1].kind, EdgeKind.FALSE_BRANCH)
-        self.assertEqual(cfg.blocks[0x08020000].instructions[1].flow.kind, FlowKind.CONDITIONAL_BRANCH)
-        self.assertEqual(cfg.blocks[0x08020004].incoming[0].source, 0x08020000)
-        self.assertEqual(cfg.block_at(0x08020000), cfg.blocks[0x08020000])
+        self.assertEqual(cfg.block_at(0x08020000).outgoing[0].kind, EdgeKind.TRUE_BRANCH)
+        self.assertEqual(cfg.block_at(0x08020000).outgoing[1].kind, EdgeKind.FALSE_BRANCH)
+        self.assertEqual(cfg.block_at(0x08020000).instructions[1].flow.kind, FlowKind.CONDITIONAL_BRANCH)
+        self.assertEqual(cfg.block_at(0x08020004).incoming[0].source, 0x08020000)
+        self.assertEqual(cfg.block_at(0x08020000).address, 0x08020000)
         self.assertEqual(cfg.successors(0x08020000), (0x08020008, 0x08020004))
         self.assertEqual(cfg.predecessors(0x08020004), (0x08020000,))
 
@@ -137,6 +137,29 @@ class CoreModelAdapterTests(unittest.TestCase):
         self.assertIs(updated.block_at(replacement.address), replacement)
         self.assertIsNot(updated, cfg)
 
+    def test_control_flow_graph_blocks_are_read_only(self) -> None:
+        original = BasicBlock(
+            address=0x08020000,
+            end=0x08020002,
+            instructions=(),
+        )
+        replacement = BasicBlock(
+            address=0x08020000,
+            end=0x08020004,
+            instructions=(),
+        )
+        blocks = {original.address: original}
+        cfg = ControlFlowGraph(
+            entry=original.address,
+            blocks=blocks,
+        )
+
+        blocks[original.address] = replacement
+
+        self.assertIs(cfg.block_at(original.address), original)
+        with self.assertRaises(TypeError):
+            cfg.blocks[original.address] = replacement
+
     def test_preserves_legacy_table_branch_targets(self) -> None:
         block = LegacyBlock(
             address=0x08020000,
@@ -152,7 +175,7 @@ class CoreModelAdapterTests(unittest.TestCase):
 
         cfg = legacy_block_graph_to_cfg(graph)
 
-        instruction = cfg.blocks[0x08020000].instructions[0]
+        instruction = cfg.block_at(0x08020000).instructions[0]
         self.assertEqual(instruction.flow.kind, FlowKind.SWITCH)
         self.assertEqual(instruction.flow.targets, (0x08020010, 0x08020020))
 
