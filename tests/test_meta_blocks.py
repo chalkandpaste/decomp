@@ -47,6 +47,49 @@ class MetaBlockTests(unittest.TestCase):
         self.assertIs(graph.source_block_at(block.address), block)
         self.assertEqual(graph.source_blocks, {block.address: block})
 
+    def test_meta_block_graph_storage_is_read_only(self) -> None:
+        original_source = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020002,
+            instructions=(),
+            successors=(),
+            predecessors=(),
+        )
+        replacement_source = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020004,
+            instructions=(),
+            successors=(),
+            predecessors=(),
+        )
+        original_meta = EndBlock(
+            address=0x08020000,
+            block_addresses=[0x08020000],
+        )
+        replacement_meta = EndBlock(
+            address=0x08020000,
+            block_addresses=[0x08020004],
+        )
+        source_blocks = {original_source.address: original_source}
+        meta_blocks = {original_meta.address: original_meta}
+        graph = MetaBlockGraph(
+            source_blocks=source_blocks,
+            meta_blocks=meta_blocks,
+            entry_address=original_source.address,
+        )
+
+        source_blocks[original_source.address] = replacement_source
+        meta_blocks[original_meta.address] = replacement_meta
+
+        self.assertIs(graph.source_block_at(original_source.address), original_source)
+        self.assertIs(graph.block_at(original_meta.address), original_meta)
+        with self.assertRaises(TypeError):
+            graph.source_blocks[original_source.address] = replacement_source
+        with self.assertRaises(TypeError):
+            graph.meta_blocks[original_meta.address] = replacement_meta
+        with self.assertRaises(FrozenInstanceError):
+            graph.entry_address = replacement_source.address
+
     def test_meta_block_graph_can_be_built_from_legacy_graph(self) -> None:
         block = LegacyBlock(
             address=0x08020000,

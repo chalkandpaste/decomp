@@ -200,7 +200,7 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         self.assertEqual(violations, [])
 
     def test_meta_block_records_are_frozen_and_tuple_backed(self) -> None:
-        record_names = {"EndBlock", "IfBlock", "LinearBlock", "SwitchBlock", "WhileBlock"}
+        record_names = {"EndBlock", "IfBlock", "LinearBlock", "MetaBlockGraph", "SwitchBlock", "WhileBlock"}
         path = Path("src/decomp/meta_blocks.py")
 
         self.assertEqual(_unfrozen_dataclass_records(path, record_names), [])

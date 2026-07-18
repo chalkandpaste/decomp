@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import TypeAlias
 
 from .legacy_types import LegacyBlock, LegacyBlockGraph, LegacyBlockIndex
@@ -66,10 +67,10 @@ class EndBlock:
 
 
 MetaBlock: TypeAlias = IfBlock | WhileBlock | LinearBlock | SwitchBlock | EndBlock
-MetaBlockIndex: TypeAlias = dict[Address, MetaBlock]
+MetaBlockIndex: TypeAlias = Mapping[Address, MetaBlock]
 
 
-@dataclass(init=False)
+@dataclass(frozen=True, init=False)
 class MetaBlockGraph:
     source_blocks: LegacyBlockIndex
     meta_blocks: MetaBlockIndex
@@ -93,9 +94,9 @@ class MetaBlockGraph:
         if entry_address is None:
             raise TypeError("MetaBlockGraph requires entry_address")
 
-        self.source_blocks = source_blocks
-        self.meta_blocks = meta_blocks
-        self.entry_address = entry_address
+        object.__setattr__(self, "source_blocks", MappingProxyType(dict(source_blocks)))
+        object.__setattr__(self, "meta_blocks", MappingProxyType(dict(meta_blocks)))
+        object.__setattr__(self, "entry_address", entry_address)
 
     @classmethod
     def from_legacy_graph(
