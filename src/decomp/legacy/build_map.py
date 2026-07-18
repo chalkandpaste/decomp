@@ -18,7 +18,7 @@ def input_seq(instruction: list[bytes], matches: list[str]) -> str | None:
 
 
 def build_map_section(comments: LegacySection, m: LegacyMap) -> LegacyMap:
-    for line in comments['section']:
+    for line in comments.section:
         if line.lstrip().startswith(b'/*'):
             pass
         elif line.lstrip().startswith(b'*/'):
@@ -45,10 +45,10 @@ def build_map(sections: list[LegacySection], m: LegacyMap) -> LegacyMap:
     print(m)
     try: 
         for section in sections:
-            if section['type']:
+            if section.type:
                 comments = section
                 # out = build_map_section(section, out)
-                for line in comments['section']:
+                for line in comments.section:
                     if line.lstrip().startswith(b'/*'):
                         pass
                     elif line.lstrip().startswith(b'*/'):
@@ -80,13 +80,13 @@ def preprocess_file(f: BinaryIO) -> list[LegacySection]:
     for line in f:
         stripped = line.lstrip()
         if stripped.startswith(b'/*'):
-            sections.append(LegacyLineSection(type=comment_switch, section=section))
+            sections.append(LegacyLineSection(type=comment_switch, section=tuple(section)))
             section = []
             section.append(line)
             comment_switch = True
         elif stripped.startswith(b'*/'):
             section.append(line)
-            sections.append(LegacyLineSection(type=comment_switch, section=section))
+            sections.append(LegacyLineSection(type=comment_switch, section=tuple(section)))
             section = []
             comment_switch = False
         else:

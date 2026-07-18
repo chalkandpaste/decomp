@@ -20,6 +20,14 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(imports, [])
 
+    def test_legacy_records_use_attribute_access(self) -> None:
+        violations = []
+        for root in (Path("src/decomp"), Path("tests")):
+            for path in sorted(root.rglob("*.py")):
+                violations.extend(_legacy_record_string_key_access(path))
+
+        self.assertEqual(violations, [])
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
@@ -49,6 +57,57 @@ def _typing_any_imports(path: Path) -> list[str]:
             if alias.name == "Any":
                 imports.append(f"{path}:{node.lineno} imports typing.Any")
     return imports
+
+
+def _legacy_record_string_key_access(path: Path) -> list[str]:
+    record_names = {
+        "block",
+        "block_graph",
+        "c",
+        "child",
+        "comments",
+        "curr_block",
+        "false_block",
+        "graph",
+        "section",
+        "start_block",
+        "true_block",
+    }
+    record_keys = {
+        "block",
+        "children",
+        "code",
+        "depth",
+        "end_loc",
+        "index",
+        "loc",
+        "parents",
+        "section",
+        "start_block",
+    }
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Subscript):
+            continue
+        if not isinstance(node.slice, ast.Constant) or not isinstance(node.slice.value, str):
+            continue
+        if node.slice.value not in record_keys:
+            continue
+        root_name = _subscript_root_name(node.value)
+        if root_name in record_names:
+            violations.append(
+                f"{path}:{node.lineno} use attribute access for {root_name}[{node.slice.value!r}]"
+            )
+    return violations
+
+
+def _subscript_root_name(node: ast.AST) -> str | None:
+    while isinstance(node, ast.Subscript):
+        node = node.value
+    if isinstance(node, ast.Name):
+        return node.id
+    return None
 
 
 def _function_arguments(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.arg]:

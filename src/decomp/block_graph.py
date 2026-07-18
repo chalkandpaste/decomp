@@ -94,17 +94,17 @@ def mk_block(
     if parents is None:
         parents = []
     return LegacyBlock(
-            loc=loc,
-            end_loc=end_loc,
-            block=block,
-            children=children,
-            parents=parents,
+            address=loc,
+            end_address=end_loc,
+            instructions=tuple(block),
+            successors=tuple(children),
+            predecessors=tuple(parents),
             depth=0,
             )
 
 def recurse_graph(block_graph: LegacyBlockGraph, f: LegacyTraversalFn, base_case: object, direction: bool) -> object:
-    start_block = block_graph['start_block']
-    block_index = block_graph['index']
+    start_block = block_graph.start_block
+    block_index = block_graph.blocks
     return recurse_blocks(start_block, block_index, f, base_case, direction)
 
 def recurse_blocks(
@@ -126,9 +126,9 @@ def recurse_blocks(
 
     while len(retrace_nodes) > 0:
         curr_block = retrace_nodes.pop(direction)
-        children = [block_index[i] for i in curr_block['children']]
+        children = [block_index[i] for i in curr_block.successors]
 
-        tally[curr_block['loc']] = False # visited
+        tally[curr_block.address] = False # visited
 
         # do thing
         out = f(curr_block, block_index, out)
@@ -137,7 +137,7 @@ def recurse_blocks(
         # get it ready for the next iteration
 
         for c in children:
-            if tally[c['loc']]: # if it hasn't been visited
+            if tally[c.address]: # if it hasn't been visited
                 retrace_nodes.append(c) # push
 
     return out
@@ -187,7 +187,7 @@ def generate_block_graph(
     return block_graph
 
 def print_block_graph(block_graph: LegacyBlockGraph) -> bytes:
-    block_index = block_graph['index']
+    block_index = block_graph.blocks
 
     locs = [k for k in block_index.keys()]
 
@@ -196,7 +196,7 @@ def print_block_graph(block_graph: LegacyBlockGraph) -> bytes:
     out = []
 
     for l in locs:
-        block = block_index[l]['block']
+        block = block_index[l].instructions
         out += block
 
     out2 = []

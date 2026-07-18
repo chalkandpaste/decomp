@@ -51,17 +51,17 @@ class MetaBlockFinder(LoopTracker):
 
             while len(retrace_nodes) > 0:
                 block = retrace_nodes.pop(-1)
-                children = [self.block_index[i] for i in block['children']]
+                children = [self.block_index[i] for i in block.successors]
 
-                tally[block['loc']] = True
-                visited.append(block['loc'])
+                tally[block.address] = True
+                visited.append(block.address)
                 
-                if block['loc'] not in reachable and (not len(children) == 0 or not self.branch_intersects(reachable, block['loc'])):
+                if block.address not in reachable and (not len(children) == 0 or not self.branch_intersects(reachable, block.address)):
                     # print("non-reachable", hex(block['loc']))
                     return False
 
                 for c in children:
-                    if c['loc'] not in tally and c not in retrace_nodes and c['loc'] != end_loc:
+                    if c.address not in tally and c not in retrace_nodes and c.address != end_loc:
                         retrace_nodes.append(c) # push
 
             # print("visited", [hex(v) for v in visited])
@@ -95,7 +95,7 @@ class MetaBlockFinder(LoopTracker):
 
             while len(retrace_nodes) > 0:
                 loc = retrace_nodes.pop(0)
-                c_locs = self.block_index[loc]['children']
+                c_locs = self.block_index[loc].successors
 
 
                 if self.is_loop_start(loc) and loc not in seen_loops:
@@ -121,7 +121,7 @@ class MetaBlockFinder(LoopTracker):
             try:
                 while len(retrace_nodes2) > 0:
                     loc = retrace_nodes2.pop(0)
-                    c_locs = self.block_index[loc]['children']
+                    c_locs = self.block_index[loc].successors
                     
                     # print("checking", hex(loc))
                     # print([hex(v) for v in paths_index[loc]])
@@ -130,7 +130,7 @@ class MetaBlockFinder(LoopTracker):
                             not self.is_loop_end(loc) and\
                             self.all_seen_are_reachable(paths_index[loc], loc) and\
                             not (self.get_loop_start(loc) in seen_loops2 and self.can_loop(loc)):
-                        if not (len(c_locs) == 1 and len(self.block_index[c_locs[0]]['parents']) == 1):
+                        if not (len(c_locs) == 1 and len(self.block_index[c_locs[0]].predecessors) == 1):
                             intersection = loc
                             break
                 
@@ -165,10 +165,10 @@ class MetaBlockFinder(LoopTracker):
 
 
 def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
-    print('annotate_graph', hex(block_graph['start_block']['loc']))
+    print('annotate_graph', hex(block_graph.start_block.address))
 
-    start_loc = block_graph['start_block']['loc']
-    block_index = block_graph['index']
+    start_loc = block_graph.start_block.address
+    block_index = block_graph.blocks
 
     mbf = MetaBlockFinder(block_index)
 
@@ -210,17 +210,17 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
         # this is something other than an if, if/then, switch (i.e., while or function endings)
         preface = []
 
-        children_locs = block_index[start_loc]['children']
+        children_locs = block_index[start_loc].successors
         children = [block_index[c] for c in children_locs]
 
         # print("pre-eating", hex(start_loc))
-        while len(children) == 1 and len(children[0]['parents']) == 1 and children_locs[0] != end_loc:
+        while len(children) == 1 and len(children[0].predecessors) == 1 and children_locs[0] != end_loc:
             preface.append(start_loc)
             # print("add to preface", hex(start_block['loc']))
             start_loc = children_locs[0]
             # print("eating", hex(start_loc))
             seen_locs[start_loc] = True
-            children_locs = block_index[start_loc]['children']
+            children_locs = block_index[start_loc].successors
             children = [block_index[c] for c in children_locs]
 
         preface.append(start_loc)
@@ -577,10 +577,10 @@ def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
     return meta_block_graph
 
 def print_block(block: LegacyBlock) -> bytes:
-    prefix = b'/*' + bytes(hex(block['loc']), 'utf-8') + b'\n'
+    prefix = b'/*' + bytes(hex(block.address), 'utf-8') + b'\n'
     suffix = b'\n*/\n'
 
-    insns = [list(filter(lambda a: isinstance(a, bytes), i)) for i in block['block']]
+    insns = [list(filter(lambda a: isinstance(a, bytes), i)) for i in block.instructions]
 
     body = b'\n'.join( [b' '.join(insn) for insn in insns] )
 
@@ -607,13 +607,13 @@ def print_if_cond(
         if not need_moar:
             block = block_index[c]
             block_out = print_block(block)
-            insns = block['block'].copy()
+            insns = list(block.instructions)
             insns.reverse()
         else:
             need_moar = False
             block = block_index[c]
             block_out = print_block(block)
-            new_insns = block['block'].copy()
+            new_insns = list(block.instructions)
             new_insns.reverse()
 
             insns = insns + new_insns
@@ -794,7 +794,7 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
 
             block_out = b'\n'.join([print_block(block_index[i]) for i in node['preface']])
 
-            switch_insn = block_index[node['preface'][-1]]['block'][-1]
+            switch_insn = block_index[node['preface'][-1]].instructions[-1]
             switch_var = crs(switch_insn[5])
 
 
@@ -847,7 +847,7 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
     return print_node_loc(start)
 
 def generate_func_decl(block_graph: LegacyBlockGraph) -> bytes:
-    start = block_graph['start_block']['loc']
+    start = block_graph.start_block.address
 
 
     fs = get_function_signature(block_graph)

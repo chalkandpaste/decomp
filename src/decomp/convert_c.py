@@ -12,10 +12,10 @@ InstructionTokens: TypeAlias = list[bytes]
 def map_sections(sections: list[LegacyLineSection]) -> list[LegacyConvertedSection]:
     new_sections = []
     for section in sections:
-        if section['type']:
+        if section.type:
             comments = section
             code = []
-            for line in comments['section']:
+            for line in comments.section:
                 if line.lstrip().startswith(b'/*'):
                     pass
                 elif line.lstrip().startswith(b'*/'):
@@ -35,7 +35,7 @@ def map_sections(sections: list[LegacyLineSection]) -> list[LegacyConvertedSecti
                         except:
                             print(instruction)
                             raise Exception
-            new_section = LegacyConvertedSection(type=section.type, section=section.section, code=code)
+            new_section = LegacyConvertedSection(type=section.type, section=section.section, code=tuple(code))
         else:
             new_section = LegacyConvertedSection(type=section.type, section=section.section, code=None)
         
@@ -316,31 +316,31 @@ def preprocess_input(raw: bytes) -> list[LegacyLineSection]:
     for line in lines:
         stripped = line.lstrip()
         if stripped.startswith(b'/*'):
-            sections.append(LegacyLineSection(type=comment_switch, section=section))
+            sections.append(LegacyLineSection(type=comment_switch, section=tuple(section)))
             section = []
             section.append(line)
             comment_switch = True
         elif stripped.startswith(b'*/'):
             section.append(line)
-            sections.append(LegacyLineSection(type=comment_switch, section=section))
+            sections.append(LegacyLineSection(type=comment_switch, section=tuple(section)))
             section = []
             comment_switch = False
         else:
             section.append(line)
 
-    sections.append(LegacyLineSection(type=comment_switch, section=section)) ## write the last section
+    sections.append(LegacyLineSection(type=comment_switch, section=tuple(section))) ## write the last section
     return sections
 
 def convert_output(sections: list[LegacyConvertedSection]) -> bytes:
     out = []
     for section in sections:
-        if section['type']:
-            for line in section['section']:
+        if section.type:
+            for line in section.section:
                 out.append(line)
-            for line in section['code']:
+            for line in section.code or ():
                 out.append(line)
         else:
-            for line in section['section']:
+            for line in section.section:
                 out.append(line)
 
     return b'\n'.join(out)

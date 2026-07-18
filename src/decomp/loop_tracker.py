@@ -85,7 +85,7 @@ class LoopTracker:
             if loc in reachable:
                 return True
 
-            c_locs = block['children']
+            c_locs = block.successors
 
             for c in c_locs:
                 if c not in seen and c not in search_locs:
@@ -104,7 +104,7 @@ class LoopTracker:
                 if loc in reachable:
                     return True
 
-                p_locs = self.block_index[loc]['parents']
+                p_locs = self.block_index[loc].predecessors
                 for p in p_locs:
                     if p not in seen and p not in search_locs:
                         search_locs.append(p)
@@ -152,7 +152,7 @@ class LoopTracker:
             loc = search_locs.pop(-1)
             seen[loc] = True
 
-            c_locs = [c for c in self.block_index[loc]['children']]
+            c_locs = [c for c in self.block_index[loc].successors]
 
             for c in c_locs:
                 # only need one counter-example
@@ -184,13 +184,13 @@ class LoopTracker:
                 if self._check_loop(loc, dont_follow):
                     if loc not in dont_follow:
                         loop_locs.append(loc)
-                    for c in self.block_index[loc]['children']:
+                    for c in self.block_index[loc].successors:
                         if c not in seen and c not in dont_follow and c not in search_locs:
                             search_locs.append(c)
                 else:
                     self.not_loop_loc[loc] = True
 
-            children_locs = [c for c in self.block_index[loc]['children']]
+            children_locs = [c for c in self.block_index[loc].successors]
             # print('children_locs', [hex(c) for c in children_locs])
 
 
@@ -212,13 +212,13 @@ class LoopTracker:
         exit_loc = None
 
         for loc in loop_locs:
-            p_locs = self.block_index[loc]['parents']
+            p_locs = self.block_index[loc].predecessors
             for p in p_locs:
                 if p not in loop_locs:
                     entrance_loc = loc
 
            
-            c_locs = self.block_index[loc]['children']
+            c_locs = self.block_index[loc].successors
             for c in c_locs:
                 if c not in loop_locs:
                     exit_loc = loc
@@ -234,7 +234,7 @@ class LoopTracker:
         # odd case of being a function start
         if entrance_loc is None:
             for loc in loop_locs:
-                p_locs = self.block_index[loc]['parents']
+                p_locs = self.block_index[loc].predecessors
                 if len(p_locs) == 1 and p_locs[0] == exit_loc: 
                     entrance_loc = loc
 

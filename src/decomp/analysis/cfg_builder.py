@@ -91,15 +91,15 @@ def cfg_to_legacy_block_graph(cfg: ControlFlowGraph) -> LegacyBlockGraph:
 
     for address, block in cfg.blocks.items():
         index[address] = LegacyBlock(
-            loc=block.address,
-            end_loc=block.end,
-            block=[_legacy_tokens(instruction) for instruction in block.instructions],
-            children=[edge.target for edge in block.outgoing],
-            parents=parents.get(address, []),
+            address=block.address,
+            end_address=block.end,
+            instructions=tuple(_legacy_tokens(instruction) for instruction in block.instructions),
+            successors=tuple(edge.target for edge in block.outgoing),
+            predecessors=tuple(parents.get(address, [])),
             depth=block.depth,
         )
 
-    return LegacyBlockGraph(index=index, start_block=index[cfg.entry])
+    return LegacyBlockGraph(blocks=index, entry_address=cfg.entry)
 
 
 def _read_block(source: InstructionSource, address: int) -> tuple[BasicBlock, list[int]]:

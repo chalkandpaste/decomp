@@ -25,13 +25,13 @@ class BlockGraphTests(unittest.TestCase):
                 override_input=insns,
             )
 
-        self.assertEqual(graph["start_block"]["loc"], 0x08020000)
+        self.assertEqual(graph.start_block.address, 0x08020000)
         self.assertEqual(
-            graph["index"][0x08020000]["children"],
-            [0x08020008, 0x08020004],
+            graph.successors(0x08020000),
+            (0x08020008, 0x08020004),
         )
-        self.assertEqual(graph["index"][0x08020004]["parents"], [0x08020000])
-        self.assertEqual(graph["index"][0x08020008]["parents"], [0x08020000])
+        self.assertEqual(graph.predecessors(0x08020004), (0x08020000,))
+        self.assertEqual(graph.predecessors(0x08020008), (0x08020000,))
 
     def test_unconditional_branch_has_single_jump_child(self) -> None:
         insns = [
@@ -47,8 +47,8 @@ class BlockGraphTests(unittest.TestCase):
                 override_input=insns,
             )
 
-        self.assertEqual(graph["index"][0x08020000]["children"], [0x08020008])
-        self.assertEqual(graph["index"][0x08020008]["parents"], [0x08020000])
+        self.assertEqual(graph.successors(0x08020000), (0x08020008,))
+        self.assertEqual(graph.predecessors(0x08020008), (0x08020000,))
 
     def test_return_block_has_no_children(self) -> None:
         insns = [
@@ -64,7 +64,7 @@ class BlockGraphTests(unittest.TestCase):
                 override_input=insns,
             )
 
-        self.assertEqual(graph["index"][0x08020000]["children"], [])
+        self.assertEqual(graph.successors(0x08020000), ())
 
     def test_typed_cfg_builder_trims_overlapping_blocks(self) -> None:
         insns = [

@@ -8,38 +8,38 @@ from decomp.legacy_adapter import legacy_block_graph_to_cfg
 class CoreModelAdapterTests(unittest.TestCase):
     def test_converts_legacy_block_graph_to_typed_cfg(self) -> None:
         block = LegacyBlock(
-            loc=0x08020000,
-            end_loc=0x08020004,
-            children=[0x08020008, 0x08020004],
-            parents=[],
+            address=0x08020000,
+            end_address=0x08020004,
+            successors=(0x08020008, 0x08020004),
+            predecessors=(),
             depth=0,
-            block=[
+            instructions=(
                 [b"0x8020000", b"2", b"0000", b"cmp", b"r0,", b"0"],
                 [b"0x8020002", b"2", b"0000", b"beq", b"0x8020008"],
-            ],
+            ),
         )
         true_block = LegacyBlock(
-            loc=0x08020008,
-            end_loc=0x0802000A,
-            children=[],
-            parents=[0x08020000],
+            address=0x08020008,
+            end_address=0x0802000A,
+            successors=(),
+            predecessors=(0x08020000,),
             depth=0,
-            block=[[b"0x8020008", b"2", b"0000", b"bx", b"lr"]],
+            instructions=([b"0x8020008", b"2", b"0000", b"bx", b"lr"],),
         )
         false_block = LegacyBlock(
-            loc=0x08020004,
-            end_loc=0x08020006,
-            children=[],
-            parents=[0x08020000],
+            address=0x08020004,
+            end_address=0x08020006,
+            successors=(),
+            predecessors=(0x08020000,),
             depth=0,
-            block=[[b"0x8020004", b"2", b"0000", b"bx", b"lr"]],
+            instructions=([b"0x8020004", b"2", b"0000", b"bx", b"lr"],),
         )
         graph = LegacyBlockGraph(
-            start_block=block,
-            index={
-                block["loc"]: block,
-                true_block["loc"]: true_block,
-                false_block["loc"]: false_block,
+            entry_address=block.address,
+            blocks={
+                block.address: block,
+                true_block.address: true_block,
+                false_block.address: false_block,
             },
         )
 
@@ -54,16 +54,16 @@ class CoreModelAdapterTests(unittest.TestCase):
 
     def test_preserves_legacy_table_branch_targets(self) -> None:
         block = LegacyBlock(
-            loc=0x08020000,
-            end_loc=0x08020002,
-            children=[0x08020010, 0x08020020],
-            parents=[],
+            address=0x08020000,
+            end_address=0x08020002,
+            successors=(0x08020010, 0x08020020),
+            predecessors=(),
             depth=0,
-            block=[
+            instructions=(
                 [b"0x8020000", b"2", b"0000", b"tbb", b"[pc,", b"r0]", [0x08020010, 0x08020020]],
-            ],
+            ),
         )
-        graph = LegacyBlockGraph(start_block=block, index={block["loc"]: block})
+        graph = LegacyBlockGraph(entry_address=block.address, blocks={block.address: block})
 
         cfg = legacy_block_graph_to_cfg(graph)
 
