@@ -1,5 +1,4 @@
 from .instruction_buffer import InstructionsBuffer
-from .instructions import cond_block_end, cond_block_end_zero, tbb, uncond_block_end
 from .analysis.cfg_builder import (
     InstructionsBufferSource,
     LegacyTokenInstructionSource,
@@ -7,99 +6,16 @@ from .analysis.cfg_builder import (
     cfg_to_legacy_block_graph,
 )
 from .legacy_types import (
-    LegacyBlock,
     LegacyBlockGraph,
     LegacyInstruction,
     LegacyTraversalFn,
 )
-from .legacy_instruction import mnemonic, next_instruction_address, operand_int, table_targets
 
 import pickle
 import os.path
 import argparse
 
 CACHE_VERSION = 4
-
-# type block_graph
-# {
-# 'index' : block_index,
-# 'start_node' : block
-# }
-
-# type block_index
-# {
-# location1 : block1,
-# ...
-# }
-
-# type block
-# {
-# 'offset_loc' : offset_loc,
-# 'block' : block_instructions,
-# 'children' : [child_loc1,..],
-# 'parent' : parent_loc'
-# '
-# }
-
-# type block_instructions
-# {
-# location1 : block1,
-# ...
-# }
-
-def get_children(block_list: list[LegacyInstruction]) -> list[int]:
-    last_insn = block_list[-1]
-    end_insn = mnemonic(last_insn)
-    if end_insn in cond_block_end:
-        jump_loc = operand_int(last_insn, 0)
-        next_block_loc = next_instruction_address(last_insn)
-
-        false_loc = next_block_loc
-        true_loc = jump_loc
-
-        children = [true_loc, false_loc]
-
-    elif end_insn in cond_block_end_zero:
-        jump_loc = operand_int(last_insn, 1)
-        next_block_loc = next_instruction_address(last_insn)
-
-        false_loc = next_block_loc
-        true_loc = jump_loc
-
-        children = [true_loc, false_loc]
-
-    elif end_insn in uncond_block_end:
-        jump_loc = operand_int(last_insn, 0)
-        children = [jump_loc]
-
-    elif end_insn in tbb:
-        children = table_targets(last_insn)
-
-    else:
-        child_loc = next_instruction_address(last_insn)
-        children = [child_loc]
-
-    return children
-
-def mk_block(
-    loc: int,
-    block: list[LegacyInstruction],
-    end_loc: int,
-    children: list[int] | None = None,
-    parents: list[int] | None = None,
-) -> LegacyBlock:
-    if children is None:
-        children = []
-    if parents is None:
-        parents = []
-    return LegacyBlock(
-            address=loc,
-            end_address=end_loc,
-            instructions=tuple(block),
-            successors=tuple(children),
-            predecessors=tuple(parents),
-            depth=0,
-            )
 
 def recurse_graph(block_graph: LegacyBlockGraph, f: LegacyTraversalFn, base_case: object, direction: bool) -> object:
     return recurse_blocks(block_graph, block_graph.entry_address, f, base_case, direction)

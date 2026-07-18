@@ -82,6 +82,15 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
     def test_block_graph_uses_explicit_instruction_imports(self) -> None:
         self.assertEqual(_wildcard_imports(Path("src/decomp/block_graph.py")), [])
 
+    def test_block_graph_does_not_keep_legacy_child_builders(self) -> None:
+        self.assertEqual(
+            _forbidden_defs(
+                Path("src/decomp/block_graph.py"),
+                {"get_children", "mk_block"},
+            ),
+            [],
+        )
+
     def test_graph_driven_modules_do_not_index_raw_block_maps(self) -> None:
         violations = []
         for path in (
@@ -161,16 +170,6 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
                 "get_function_signature",
                 "LoopTracker",
                 {"block_graph"},
-            ),
-            [],
-        )
-
-    def test_get_children_uses_legacy_instruction_accessors(self) -> None:
-        self.assertEqual(
-            _raw_numeric_subscripts_in_function(
-                Path("src/decomp/block_graph.py"),
-                "get_children",
-                {0, 1, 3, 4, 5},
             ),
             [],
         )
