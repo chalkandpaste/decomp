@@ -53,17 +53,43 @@ MetaBlock: TypeAlias = IfBlock | WhileBlock | LinearBlock | SwitchBlock | EndBlo
 MetaBlockIndex: TypeAlias = dict[Address, MetaBlock]
 
 
-@dataclass
+@dataclass(init=False)
 class MetaBlockGraph:
-    block_index: LegacyBlockIndex
+    source_blocks: LegacyBlockIndex
     meta_blocks: MetaBlockIndex
     entry_address: Address
+
+    def __init__(
+        self,
+        source_blocks: LegacyBlockIndex | None = None,
+        meta_blocks: MetaBlockIndex | None = None,
+        entry_address: Address | None = None,
+        block_index: LegacyBlockIndex | None = None,
+    ) -> None:
+        if source_blocks is None:
+            if block_index is None:
+                raise TypeError("MetaBlockGraph requires source_blocks")
+            source_blocks = block_index
+        elif block_index is not None:
+            raise TypeError("pass source_blocks, not both source_blocks and block_index")
+        if meta_blocks is None:
+            raise TypeError("MetaBlockGraph requires meta_blocks")
+        if entry_address is None:
+            raise TypeError("MetaBlockGraph requires entry_address")
+
+        self.source_blocks = source_blocks
+        self.meta_blocks = meta_blocks
+        self.entry_address = entry_address
+
+    @property
+    def block_index(self) -> LegacyBlockIndex:
+        return self.source_blocks
 
     def block_at(self, address: Address) -> MetaBlock:
         return self.meta_blocks[address]
 
     def source_block_at(self, address: Address) -> LegacyBlock:
-        return self.block_index[address]
+        return self.source_blocks[address]
 
     def source_blocks_at(self, addresses: list[Address] | tuple[Address, ...]) -> tuple[LegacyBlock, ...]:
         return tuple(self.source_block_at(address) for address in addresses)

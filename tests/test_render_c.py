@@ -19,7 +19,7 @@ class RenderCTests(unittest.TestCase):
         )
 
         graph = MetaBlockGraph(
-            block_index={address: block},
+            source_blocks={address: block},
             meta_blocks={},
             entry_address=address,
         )

@@ -404,7 +404,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
             raise Exception
 
     return MetaBlockGraph(
-            block_index=block_graph.blocks,
+            source_blocks=block_graph.blocks,
             meta_blocks=meta_block_index,
             entry_address=meta_block_start,
             )

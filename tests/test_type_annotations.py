@@ -63,6 +63,14 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_meta_block_graph_construction_uses_source_blocks_name(self) -> None:
+        violations = []
+        for root in (Path("src/decomp"), Path("tests")):
+            for path in sorted(root.rglob("*.py")):
+                violations.extend(_legacy_meta_block_graph_constructor_keywords(path))
+
+        self.assertEqual(violations, [])
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
@@ -198,6 +206,20 @@ def _raw_block_index_access(path: Path) -> list[str]:
             continue
         if _subscript_root_name(node.value) == "block_index":
             violations.append(f"{path}:{node.lineno} use LegacyBlockGraph methods instead of block_index[...]")
+    return violations
+
+
+def _legacy_meta_block_graph_constructor_keywords(path: Path) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Name) or node.func.id != "MetaBlockGraph":
+            continue
+        for keyword in node.keywords:
+            if keyword.arg == "block_index":
+                violations.append(f"{path}:{node.lineno} construct MetaBlockGraph with source_blocks=")
     return violations
 
 
