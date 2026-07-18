@@ -403,10 +403,14 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
             )
 
 def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
-    meta_index = meta_block_graph.meta_blocks
+    graph = meta_block_graph
     start = meta_block_graph.entry_address
 
     seen_loops = {} # prevent loops...
+
+    def replace_meta_block(block: MetaBlock) -> None:
+        nonlocal graph
+        graph = graph.with_block(block)
 
     def simplify_base_node(node: MetaBlock) -> int | None:
         if isinstance(node, IfBlock):
@@ -419,7 +423,7 @@ def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
             # match up with the false loc of the parent (i.e., total of 2 unique locs not 3)
             # and simplify
 
-            true_node = meta_index[true_loc] if true_loc is not None else None
+            true_node = graph.block_at(true_loc) if true_loc is not None else None
             
             if isinstance(true_node, IfBlock):
                 # print('checking if for simplification')
@@ -435,27 +439,31 @@ def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
                 # if it's a conjunction it would not have a next, only the parent can have a next
                 if child_next_loc is None and child_true_loc == false_loc: 
                     # print('simplifying')
-                    meta_index[node.address] = replace(
-                        node,
-                        condition_blocks=node.condition_blocks + true_node.condition_blocks,
-                        false_address=child_false_loc,
-                        conjunctions=(
-                            node.conjunctions
-                            + (b' && ',)
-                            + tuple(b' && ' if c == b' || ' else b' || ' for c in true_node.conjunctions)
+                    replace_meta_block(
+                        replace(
+                            node,
+                            condition_blocks=node.condition_blocks + true_node.condition_blocks,
+                            false_address=child_false_loc,
+                            conjunctions=(
+                                node.conjunctions
+                                + (b' && ',)
+                                + tuple(b' && ' if c == b' || ' else b' || ' for c in true_node.conjunctions)
+                            ),
+                            flags=node.flags + true_node.flags,
                         ),
-                        flags=node.flags + true_node.flags,
                     )
                     # repeat this until there are no simplifications
                     node_loc = node.address
                 elif child_next_loc is None and child_false_loc == false_loc:
                     # print('simplifying')
-                    meta_index[node.address] = replace(
-                        node,
-                        condition_blocks=node.condition_blocks + true_node.condition_blocks,
-                        false_address=child_true_loc,
-                        conjunctions=node.conjunctions + (b' && ',) + true_node.conjunctions,
-                        flags=node.flags + true_node.flags,
+                    replace_meta_block(
+                        replace(
+                            node,
+                            condition_blocks=node.condition_blocks + true_node.condition_blocks,
+                            false_address=child_true_loc,
+                            conjunctions=node.conjunctions + (b' && ',) + true_node.conjunctions,
+                            flags=node.flags + true_node.flags,
+                        ),
                     )
                     
                     # repeat this until there are no simplifications
@@ -512,12 +520,12 @@ def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
             # else:
                 # print("simplify node end")
             
-            node = meta_index[node_loc] if node_loc is not None else None
+            node = graph.block_at(node_loc) if node_loc is not None else None
         return None
 
     def simplify_node_loc(node_loc: int) -> None:
         # print("simplify node_loc", hex(node_loc))
-        node = meta_index[node_loc]
+        node = graph.block_at(node_loc)
         return simplify_node(node)
 
     # print('start simplify')
@@ -526,4 +534,4 @@ def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
 
     # print('done simplify')
 
-    return meta_block_graph
+    return graph

@@ -172,6 +172,17 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_meta_block_driven_modules_use_graph_methods(self) -> None:
+        violations = []
+        for path in (
+            Path("src/decomp/render_c.py"),
+            Path("src/decomp/structure.py"),
+        ):
+            violations.extend(_attribute_access_violations(path, "meta_block_graph", {"meta_blocks"}))
+            violations.extend(_attribute_access_violations(path, "graph", {"meta_blocks"}))
+
+        self.assertEqual(violations, [])
+
     def test_meta_block_records_are_frozen_and_tuple_backed(self) -> None:
         record_names = {"EndBlock", "IfBlock", "LinearBlock", "SwitchBlock", "WhileBlock"}
         path = Path("src/decomp/meta_blocks.py")

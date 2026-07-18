@@ -198,7 +198,6 @@ def render_condition(
 
 
 def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
-    meta_index = meta_block_graph.meta_blocks
     start = meta_block_graph.entry_address
 
     seen_loops: set[int] = set()
@@ -292,12 +291,12 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
             # else:
                 # print("node end")
             
-            node = meta_index[node_loc] if node_loc is not None else None
+            node = meta_block_graph.block_at(node_loc) if node_loc is not None else None
         return out
 
     def print_node_loc(node_loc: int) -> bytes:
         # print("node_loc", hex(node_loc))
-        node = meta_index[node_loc]
+        node = meta_block_graph.block_at(node_loc)
         return print_node(node)
 
     return print_node_loc(start)

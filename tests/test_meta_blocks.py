@@ -6,7 +6,7 @@ import unittest
 from decomp.block_graph import generate_block_graph
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 from decomp.meta_blocks import EndBlock, IfBlock, LinearBlock, MetaBlockGraph, SwitchBlock
-from decomp.structure import annotate_graph
+from decomp.structure import annotate_graph, simplify_if
 
 
 class MetaBlockTests(unittest.TestCase):
@@ -67,6 +67,71 @@ class MetaBlockTests(unittest.TestCase):
         )
 
         self.assertIs(graph.source_block_at(block.address), block)
+
+    def test_meta_block_graph_replaces_blocks_without_mutating_source_graph(self) -> None:
+        original = EndBlock(
+            address=0x08020000,
+            block_addresses=[0x08020000],
+        )
+        replacement = EndBlock(
+            address=0x08020000,
+            block_addresses=[0x08020004],
+        )
+        graph = MetaBlockGraph(
+            source_blocks={},
+            meta_blocks={original.address: original},
+            entry_address=original.address,
+        )
+
+        updated = graph.with_block(replacement)
+
+        self.assertIs(graph.block_at(original.address), original)
+        self.assertIs(updated.block_at(replacement.address), replacement)
+        self.assertIsNot(updated, graph)
+
+    def test_simplify_if_returns_updated_graph_without_mutating_input(self) -> None:
+        parent = IfBlock(
+            address=0x08020000,
+            condition_blocks=[0x08020000],
+            flags=[True],
+            conjunctions=[],
+            true_address=0x08020008,
+            false_address=0x08020004,
+            next_address=None,
+        )
+        child = IfBlock(
+            address=0x08020004,
+            condition_blocks=[0x08020004],
+            flags=[False],
+            conjunctions=[b" || "],
+            true_address=None,
+            false_address=0x08020008,
+            next_address=None,
+        )
+        end = EndBlock(
+            address=0x08020008,
+            block_addresses=[0x08020008],
+        )
+        graph = MetaBlockGraph(
+            source_blocks={},
+            meta_blocks={
+                parent.address: parent,
+                child.address: child,
+                end.address: end,
+            },
+            entry_address=parent.address,
+        )
+
+        updated = simplify_if(graph)
+
+        self.assertIs(graph.block_at(parent.address), parent)
+        self.assertIsNot(updated, graph)
+        simplified = updated.block_at(parent.address)
+        self.assertIsInstance(simplified, IfBlock)
+        self.assertEqual(simplified.condition_blocks, (0x08020000, 0x08020004))
+        self.assertEqual(simplified.false_address, None)
+        self.assertEqual(simplified.conjunctions, (b" && ", b" && "))
+        self.assertEqual(simplified.flags, (True, False))
 
     def test_meta_blocks_normalize_sequence_fields_to_tuples(self) -> None:
         if_block = IfBlock(

@@ -113,6 +113,15 @@ class MetaBlockGraph:
     def block_at(self, address: Address) -> MetaBlock:
         return self.meta_blocks[address]
 
+    def with_block(self, block: MetaBlock) -> "MetaBlockGraph":
+        meta_blocks = dict(self.meta_blocks)
+        meta_blocks[block.address] = block
+        return MetaBlockGraph(
+            source_blocks=self.source_blocks,
+            meta_blocks=meta_blocks,
+            entry_address=self.entry_address,
+        )
+
     def source_block_at(self, address: Address) -> LegacyBlock:
         return self.source_blocks[address]
 
