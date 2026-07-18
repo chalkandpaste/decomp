@@ -57,7 +57,7 @@ class MetaBlockFinder(LoopTracker):
         
         paths_index = { start_loc : [] } # { dest1 : [src1, src2, ..] , ...}
         retrace_nodes = [start_loc]
-        seen_loops = { }
+        seen_loops: set[int] = set()
         
         check = False
         while intersection is None:
@@ -70,7 +70,7 @@ class MetaBlockFinder(LoopTracker):
 
 
                 if self.is_loop_start(loc) and loc not in seen_loops:
-                    seen_loops[loc] = True
+                    seen_loops.add(loc)
 
                 for c in c_locs:
                     if c not in seen_loops: 
@@ -88,7 +88,7 @@ class MetaBlockFinder(LoopTracker):
                     break
             
             retrace_nodes2 = [start_loc]
-            seen_loops2 = {}
+            seen_loops2: set[int] = set()
             try:
                 while len(retrace_nodes2) > 0:
                     loc = retrace_nodes2.pop(0)
@@ -107,7 +107,7 @@ class MetaBlockFinder(LoopTracker):
                 
                     if loc in seen_loops and loc not in seen_loops2:
                         # promote to a seen loop for this cycle
-                        seen_loops2[loc] = True
+                        seen_loops2.add(loc)
 
                     if loc != end_loc: # end_loc is not None and 
                         for c in c_locs:
@@ -142,7 +142,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
 
     mbf = MetaBlockFinder(block_graph)
 
-    meta_block_index = {}
+    meta_block_index: dict[int, MetaBlock] = {}
     meta_block_start = start_loc
 
     end_loc = mbf.get_next_meta_block_loc(start_loc)
@@ -157,8 +157,8 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
     # raise Exception
 
     meta_block_locs.reverse()
-    seen_locs = {}
-    loops = { }
+    seen_locs: set[int] = set()
+    loops: set[int] = set()
 
     while len(meta_block_locs) > 0:
         # print("meta_block_locs", [(hex(s),(hex(e) if e is not None else None)) for (s,e) in meta_block_locs])
@@ -168,7 +168,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
 
         meta_block_loc = start_loc
 
-        seen_locs[start_loc] = True
+        seen_locs.add(start_loc)
 
 
         # proceed the start block forward to the first condition, and fold into `preface`
@@ -187,11 +187,11 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
             preface.append(start_loc)
             start_loc = children_locs[0]
             # print("eating", hex(start_loc))
-            seen_locs[start_loc] = True
+            seen_locs.add(start_loc)
             children_locs = block_graph.successors(start_loc)
 
         preface.append(start_loc)
-        seen_locs[start_loc] = True
+        seen_locs.add(start_loc)
 
         if len(children_locs) == 2:
             have_not_made_meta_block = meta_block_loc not in meta_block_index
@@ -204,7 +204,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
             if have_not_made_meta_block and is_loop and not have_seen_children: # children_locs[0] in seen_locs and 
                 print('making while', hex(meta_block_loc))
                 loop_end_loc = mbf.get_loop_end(meta_block_loc)
-                seen_locs[loop_end_loc] = True
+                seen_locs.add(loop_end_loc)
                 print('loop_end_loc', hex(loop_end_loc))
                 next_start_loc = mbf.get_next_meta_block_loc(loop_end_loc, end_loc)
                 if next_start_loc is not None:
@@ -220,7 +220,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                             condition_address=loop_end_loc,
                             next_address=next_start_loc,
                         )
-                loops[meta_block_loc] = True
+                loops.add(meta_block_loc)
                 meta_block_locs.append((meta_block_loc, loop_end_loc))
             else: # elif children_locs[0] not in seen_locs or children_locs[1] not in seen_locs:
                 # [true, false] == c[0], c[1]
@@ -245,7 +245,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                                     if not (next_start_loc,end_loc) in meta_block_locs and next_start_loc not in seen_locs:
                                         meta_block_locs.append((next_start_loc, end_loc))
                                         # pre-emptively mark seen?
-                                        seen_locs[next_start_loc] = True
+                                        seen_locs.add(next_start_loc)
                                 else:
                                     # print('2')
                                     next_start_loc = None
@@ -275,7 +275,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                                     true_end_loc is not None):
                                 if true_loc not in seen_locs:
                                     true_loc = temp_true_loc
-                                    seen_locs[true_loc] = True
+                                    seen_locs.add(true_loc)
                                     meta_block_locs.append((true_loc, child_end_loc))
                                 
                     if temp_false_loc != child_end_loc:
@@ -286,7 +286,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                                     false_end_loc is not None): ## there is no endpoint/subgraph
                                 if false_loc not in seen_locs :
                                     false_loc = temp_false_loc
-                                    seen_locs[false_loc] = True
+                                    seen_locs.add(false_loc)
                                     if (false_loc, false_end_loc) not in meta_block_locs:
                                         meta_block_locs.append((false_loc, child_end_loc))
                    
@@ -300,9 +300,9 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                             while_block,
                             inner=IfBlock(
                                 address=meta_block_loc,
-                                condition_blocks=preface,
-                                flags=[True],
-                                conjunctions=[],
+                                condition_blocks=tuple(preface),
+                                flags=(True,),
+                                conjunctions=(),
                                 true_address=true_loc,
                                 false_address=false_loc,
                                 next_address=next_start_loc,
@@ -311,9 +311,9 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                     else:
                         meta_block_index[meta_block_loc] = IfBlock(
                                 address=meta_block_loc,
-                                condition_blocks=preface,
-                                flags=[True],
-                                conjunctions=[],
+                                condition_blocks=tuple(preface),
+                                flags=(True,),
+                                conjunctions=(),
                                 true_address=true_loc,
                                 false_address=false_loc,
                                 next_address=next_start_loc,
@@ -329,7 +329,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
 
             meta_block_index[meta_block_loc] = SwitchBlock(
                     address=meta_block_loc,
-                    preface=preface,
+                    preface=tuple(preface),
                     cases=tuple(children_locs),
                     next_address=end_loc,
                     )
@@ -337,7 +337,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
         elif len(children_locs) == 1:
             print("making block node", hex(meta_block_loc))
 
-            blocks = preface
+            block_addresses = tuple(preface)
             
             next_loc = children_locs[0]
             
@@ -350,7 +350,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                     # print('1i2')
                     if next_loc not in seen_locs:
                         # print('2i2')
-                        seen_locs[next_loc] = True
+                        seen_locs.add(next_loc)
                         if (next_loc,end_loc) not in meta_block_locs :
                             # print('2i3')
                             meta_block_locs.append((next_loc, end_loc))
@@ -374,7 +374,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
             if next_end is not None or (next_end is None and end_loc is None):
                 meta_block_index[meta_block_loc] = LinearBlock(
                             address=meta_block_loc,
-                            block_addresses=blocks,
+                            block_addresses=block_addresses,
                             next_address=next_loc,
                         )
 
@@ -382,7 +382,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                 # print('no next')
                 meta_block_index[meta_block_loc] = LinearBlock(
                             address=meta_block_loc,
-                            block_addresses=blocks,
+                            block_addresses=block_addresses,
                             next_address=None,
                         )
             
@@ -391,7 +391,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
            # print('making end_node')
             meta_block_index[meta_block_loc] = EndBlock(
                         address=meta_block_loc,
-                        block_addresses=preface,
+                        block_addresses=tuple(preface),
                     )
         else:
             raise Exception
@@ -406,7 +406,7 @@ def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
     graph = meta_block_graph
     start = meta_block_graph.entry_address
 
-    seen_loops = {} # prevent loops...
+    seen_loops: set[int] = set() # prevent loops...
 
     def replace_meta_block(block: MetaBlock) -> None:
         nonlocal graph
@@ -507,7 +507,7 @@ def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
             # manually unwrap and progress while, because it uses `inner` which is a meta_block, not loc
             if isinstance(node, WhileBlock):
                 node_loc = node.address
-                seen_loops[node_loc] = True
+                seen_loops.add(node_loc)
                 simplify_node(node.inner)
                 
                 node_loc = node.next_address

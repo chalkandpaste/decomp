@@ -206,6 +206,21 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         self.assertEqual(_unfrozen_dataclass_records(path, record_names), [])
         self.assertEqual(_mutable_list_record_fields(path, record_names), [])
 
+    def test_structure_uses_sets_for_membership_tracking(self) -> None:
+        self.assertEqual(
+            _empty_dict_assignments(
+                Path("src/decomp/structure.py"),
+                {"loops", "seen_locs", "seen_loops", "seen_loops2"},
+            ),
+            [],
+        )
+
+    def test_structure_constructs_tuple_backed_meta_blocks(self) -> None:
+        self.assertEqual(
+            _mutable_meta_block_constructor_arguments(Path("src/decomp/structure.py")),
+            [],
+        )
+
     def test_add_function_sigs_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _exact_import_violations(
@@ -967,6 +982,53 @@ def _annotation_uses_list(node: ast.AST) -> bool:
     if isinstance(node, ast.BinOp):
         return _annotation_uses_list(node.left) or _annotation_uses_list(node.right)
     return False
+
+
+def _empty_dict_assignments(path: Path, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            if not _is_empty_dict(node.value):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in names:
+                    violations.append(f"{path}:{node.lineno} use set() for membership tracking")
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and node.target.id in names and _is_empty_dict(node.value):
+                violations.append(f"{path}:{node.lineno} use set() for membership tracking")
+    return violations
+
+
+def _is_empty_dict(node: ast.AST | None) -> bool:
+    return isinstance(node, ast.Dict) and len(node.keys) == 0 and len(node.values) == 0
+
+
+def _mutable_meta_block_constructor_arguments(path: Path) -> list[str]:
+    record_keyword_names = {
+        "IfBlock": {"condition_blocks", "conjunctions", "flags"},
+        "LinearBlock": {"block_addresses"},
+        "SwitchBlock": {"cases", "preface"},
+        "EndBlock": {"block_addresses"},
+    }
+    list_variable_names = {"children_locs", "preface"}
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        call_name = _call_name(node.func)
+        keyword_names = record_keyword_names.get(call_name)
+        if keyword_names is None:
+            continue
+        for keyword in node.keywords:
+            if keyword.arg not in keyword_names:
+                continue
+            if isinstance(keyword.value, ast.List):
+                violations.append(f"{path}:{node.lineno} pass tuple-backed values to {call_name}.{keyword.arg}")
+            elif isinstance(keyword.value, ast.Name) and keyword.value.id in list_variable_names:
+                violations.append(f"{path}:{node.lineno} wrap {keyword.value.id} before {call_name}.{keyword.arg}")
+    return violations
 
 
 def _raw_numeric_subscripts_in_function(path: Path, function_name: str, indexes: set[int]) -> list[str]:
