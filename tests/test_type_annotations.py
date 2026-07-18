@@ -142,6 +142,17 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_function_signature_wrapper_uses_typed_loop_tracker(self) -> None:
+        self.assertEqual(
+            _call_argument_name_violations(
+                Path("src/decomp/function_signatures.py"),
+                "get_function_signature",
+                "LoopTracker",
+                {"block_graph"},
+            ),
+            [],
+        )
+
     def test_get_children_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _raw_numeric_subscripts_in_function(
@@ -432,6 +443,28 @@ def _function_call_violations(path: Path, function_name: str, names: set[str]) -
             name = _call_name(child.func)
             if name in names:
                 violations.append(f"{path}:{child.lineno} {function_name} should not call {name}")
+    return violations
+
+
+def _call_argument_name_violations(
+    path: Path,
+    function_name: str,
+    call_name: str,
+    argument_names: set[str],
+) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Call):
+                continue
+            if _call_name(child.func) != call_name:
+                continue
+            for argument in child.args:
+                if isinstance(argument, ast.Name) and argument.id in argument_names:
+                    violations.append(f"{path}:{child.lineno} {function_name} should not pass {argument.id} to {call_name}")
     return violations
 
 

@@ -63,7 +63,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
     print('get_function_signature', hex(entry_address))
 
     cfg = legacy_block_graph_to_cfg(block_graph)
-    loop_tracker = LoopTracker(block_graph)
+    loop_tracker = LoopTracker(cfg)
     return _get_function_signature_from_cfg(cfg, loop_tracker)
 
 

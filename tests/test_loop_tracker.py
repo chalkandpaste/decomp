@@ -2,6 +2,7 @@ import contextlib
 import io
 import unittest
 
+from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 from decomp.loop_tracker import LoopTracker
 
@@ -28,6 +29,34 @@ class LoopTrackerTests(unittest.TestCase):
                 second.address: second,
             },
             entry_address=first.address,
+        )
+
+        tracker = LoopTracker(graph)
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertTrue(tracker.can_loop(first.address))
+
+    def test_loop_tracker_accepts_typed_control_flow_graph(self) -> None:
+        first = BasicBlock(
+            address=0x08020000,
+            end=0x08020002,
+            instructions=(),
+            outgoing=(Edge(source=0x08020000, target=0x08020002),),
+            incoming=(Edge(source=0x08020002, target=0x08020000),),
+        )
+        second = BasicBlock(
+            address=0x08020002,
+            end=0x08020004,
+            instructions=(),
+            outgoing=(Edge(source=0x08020002, target=0x08020000),),
+            incoming=(Edge(source=0x08020000, target=0x08020002),),
+        )
+        graph = ControlFlowGraph(
+            entry=first.address,
+            blocks={
+                first.address: first,
+                second.address: second,
+            },
         )
 
         tracker = LoopTracker(graph)

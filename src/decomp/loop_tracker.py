@@ -1,9 +1,19 @@
-from .legacy_types import LegacyBlockGraph
+from __future__ import annotations
+
+from typing import Protocol
+
+
+class LoopGraph(Protocol):
+    def successors(self, address: int) -> tuple[int, ...]:
+        pass
+
+    def predecessors(self, address: int) -> tuple[int, ...]:
+        pass
 
 
 class LoopTracker:
 
-    def __init__(self, graph: LegacyBlockGraph) -> None:
+    def __init__(self, graph: LoopGraph) -> None:
         self.graph = graph
         self.loc_to_loop_end: dict[int, int | None] = {}
         self.loc_to_loop_start: dict[int, int | None] = {}
@@ -78,16 +88,13 @@ class LoopTracker:
 
         while len(search_locs) > 0:
             loc = search_locs.pop(0)
-            block = self.graph.block_at(loc)
 
             seen[loc] = True
 
             if loc in reachable:
                 return True
 
-            c_locs = block.successors
-
-            for c in c_locs:
+            for c in self.graph.successors(loc):
                 if c not in seen and c not in search_locs:
                     search_locs.append(c)
                     branch_locs.append(c)
