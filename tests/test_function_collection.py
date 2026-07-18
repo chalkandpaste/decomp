@@ -6,8 +6,17 @@ from decomp.analysis import (
     build_control_flow_graph,
     collect_call_references,
 )
+from decomp.arch.arm_thumb import ArmThumbArchitectureBehavior
+from decomp.core.cfg import BasicBlock, ControlFlowGraph
+from decomp.core.flow import FlowInfo, FlowKind
+from decomp.core.instruction import Instruction
 from decomp.function_signatures import collect_functions
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
+
+
+class IdentityAddressBehavior(ArmThumbArchitectureBehavior):
+    def normalize_code_address(self, address: int) -> int:
+        return address
 
 
 class CollectFunctionsTests(unittest.TestCase):
@@ -71,6 +80,25 @@ class CollectFunctionsTests(unittest.TestCase):
         self.assertEqual(len(references), 1)
         self.assertEqual(references[0].target, 0x08030000)
         self.assertEqual(references[0].kind, CallReferenceKind.DIRECT_CALL)
+
+    def test_typed_xrefs_accept_architecture_behavior(self) -> None:
+        instruction = Instruction(
+            address=0x08020000,
+            size=4,
+            data=b"\x00\x00\x00\x00",
+            mnemonic="bl",
+            flow=FlowInfo(kind=FlowKind.CALL, targets=(0x08030001,)),
+        )
+        block = BasicBlock(
+            address=instruction.address,
+            end=instruction.address + instruction.size,
+            instructions=(instruction,),
+        )
+        cfg = ControlFlowGraph(entry=block.address, blocks={block.address: block})
+
+        references = collect_call_references(cfg, behavior=IdentityAddressBehavior())
+
+        self.assertEqual(references[0].target, 0x08030001)
 
     def test_typed_xrefs_collect_indirect_literal_calls(self) -> None:
         insns = [

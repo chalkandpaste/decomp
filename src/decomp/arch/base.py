@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from decomp.core.address import Address
 from decomp.core.flow import FlowInfo
 from decomp.core.image import FirmwareImage
 from decomp.core.instruction import Instruction
@@ -51,3 +52,38 @@ class ArchitectureBackend(Protocol):
 
     def is_probable_code_address(self, image: FirmwareImage, value: int) -> bool:
         """Return whether a literal can plausibly reference code for this target."""
+
+
+class ArchitectureBehavior(Protocol):
+    def normalize_code_address(self, address: Address) -> Address:
+        """Normalize an architecture-specific code pointer into an instruction address."""
+
+    def is_block_terminator(self, instruction: Instruction) -> bool:
+        """Return whether an instruction ends a basic block."""
+
+    def is_function_end_candidate(self, instruction: Instruction) -> bool:
+        """Return whether an instruction may end the current function."""
+
+    def returns_via_program_counter(self, instruction: Instruction) -> bool:
+        """Return whether an instruction restores or branches directly to PC."""
+
+    def restores_link_register(self, instruction: Instruction) -> bool:
+        """Return whether an instruction restores LR for a following tail branch."""
+
+    def returns_to_link_register(self, instruction: Instruction) -> bool:
+        """Return whether an instruction returns directly through LR."""
+
+    def is_stack_pop(self, instruction: Instruction) -> bool:
+        """Return whether an instruction is the stack-pop form with special return handling."""
+
+    def is_unconditional_branch(self, instruction: Instruction) -> bool:
+        """Return whether an instruction is an unconditional branch."""
+
+    def is_exchange_transfer(self, instruction: Instruction) -> bool:
+        """Return whether an instruction transfers control through a register."""
+
+    def is_register_restore(self, instruction: Instruction) -> bool:
+        """Return whether an instruction restores registers from the stack."""
+
+    def is_move_to_register(self, instruction: Instruction, register: str) -> bool:
+        """Return whether an instruction loads/moves an immediate into a target register."""

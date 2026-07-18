@@ -319,6 +319,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_shared_analysis_uses_architecture_behavior_protocol(self) -> None:
+        violations = []
+        for path in (
+            Path("src/decomp/analysis/cfg_builder.py"),
+            Path("src/decomp/analysis/xrefs.py"),
+        ):
+            violations.extend(_import_prefix_violations(path, {"decomp.arch.arm_thumb"}))
+
+        self.assertEqual(violations, [])
+
     def test_cfg_block_collection_uses_typed_return_predicates(self) -> None:
         self.assertEqual(
             _exact_import_violations(
@@ -513,6 +523,20 @@ def _exact_import_violations(path: Path, modules: set[str]) -> list[str]:
                     violations.append(f"{path}:{node.lineno} keep {alias.name} behind a typed helper")
         if isinstance(node, ast.ImportFrom) and node.module in modules:
             violations.append(f"{path}:{node.lineno} keep {node.module} behind a typed helper")
+    return violations
+
+
+def _import_prefix_violations(path: Path, prefixes: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if any(alias.name == prefix or alias.name.startswith(f"{prefix}.") for prefix in prefixes):
+                    violations.append(f"{path}:{node.lineno} depend on architecture behavior protocol")
+        if isinstance(node, ast.ImportFrom) and node.module is not None:
+            if any(node.module == prefix or node.module.startswith(f"{prefix}.") for prefix in prefixes):
+                violations.append(f"{path}:{node.lineno} depend on architecture behavior protocol")
     return violations
 
 

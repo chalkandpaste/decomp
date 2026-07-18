@@ -3,12 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from decomp.arch.arm_thumb.addresses import normalize_interworking_address
-from decomp.arch.arm_thumb.instruction_kinds import (
-    is_exchange_transfer,
-    is_move_to_register,
-    is_register_restore,
-)
+from decomp.arch import ArchitectureBehavior, default_architecture_behavior
 from decomp.core.cfg import BasicBlock, ControlFlowGraph
 from decomp.core.instruction import Instruction
 
@@ -34,28 +29,39 @@ class CallReference:
         }
 
 
-def collect_call_references(cfg: ControlFlowGraph) -> tuple[CallReference, ...]:
+def collect_call_references(
+    cfg: ControlFlowGraph,
+    behavior: ArchitectureBehavior | None = None,
+) -> tuple[CallReference, ...]:
+    architecture = behavior or default_architecture_behavior()
     references = []
 
     for address in cfg.reachable_order():
         block = cfg.block_at(address)
-        references.extend(_collect_block_references(cfg.entry, block))
+        references.extend(_collect_block_references(cfg.entry, block, architecture))
 
     return tuple(_dedupe_references(references))
 
 
-def collect_function_addresses(cfg: ControlFlowGraph) -> list[int]:
-    references = collect_call_references(cfg)
+def collect_function_addresses(
+    cfg: ControlFlowGraph,
+    behavior: ArchitectureBehavior | None = None,
+) -> list[int]:
+    references = collect_call_references(cfg, behavior)
     return list({reference.target for reference in references})
 
 
-def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReference]:
+def _collect_block_references(
+    entry: int,
+    block: BasicBlock,
+    behavior: ArchitectureBehavior,
+) -> list[CallReference]:
     references = []
     instructions = block.instructions
 
     for index, instruction in enumerate(instructions):
         if instruction.flow.is_direct_call():
-            for target in instruction.flow.target_addresses(normalize_interworking_address):
+            for target in instruction.flow.target_addresses(behavior.normalize_code_address):
                 references.append(
                     CallReference(
                         source=instruction.address,
@@ -63,10 +69,10 @@ def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReferen
                         kind=CallReferenceKind.DIRECT_CALL,
                     )
                 )
-        elif is_exchange_transfer(instruction):
+        elif behavior.is_exchange_transfer(instruction):
             register = instruction.operand_register(0)
             if register != "lr":
-                target = _literal_loaded_into_register(instructions, index, register)
+                target = _literal_loaded_into_register(instructions, index, register, behavior)
                 if target is not None:
                     references.append(
                         CallReference(
@@ -76,7 +82,7 @@ def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReferen
                         )
                     )
         elif instruction.flow.is_unconditional_branch():
-            for target in instruction.flow.target_addresses(normalize_interworking_address):
+            for target in instruction.flow.target_addresses(behavior.normalize_code_address):
                 if block.address == entry and target < entry:
                     references.append(
                         CallReference(
@@ -85,17 +91,21 @@ def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReferen
                             kind=CallReferenceKind.LOWER_TAIL_BRANCH,
                         )
                     )
-        elif is_register_restore(instruction):
-            references.extend(_tail_branches_after_restore(instructions, index))
+        elif behavior.is_register_restore(instruction):
+            references.extend(_tail_branches_after_restore(instructions, index, behavior))
 
     return references
 
 
-def _tail_branches_after_restore(instructions: tuple[Instruction, ...], start_index: int) -> list[CallReference]:
+def _tail_branches_after_restore(
+    instructions: tuple[Instruction, ...],
+    start_index: int,
+    behavior: ArchitectureBehavior,
+) -> list[CallReference]:
     references = []
     for instruction in instructions[start_index:]:
         if instruction.flow.is_unconditional_branch():
-            for target in instruction.flow.target_addresses(normalize_interworking_address):
+            for target in instruction.flow.target_addresses(behavior.normalize_code_address):
                 references.append(
                     CallReference(
                         source=instruction.address,
@@ -110,14 +120,15 @@ def _literal_loaded_into_register(
     instructions: tuple[Instruction, ...],
     index: int,
     register: str | None,
+    behavior: ArchitectureBehavior,
 ) -> int | None:
     if register is None:
         return None
     for previous in reversed(instructions[:index]):
-        if is_move_to_register(previous, register):
+        if behavior.is_move_to_register(previous, register):
             target = previous.operand_int(1)
             if target is not None:
-                return normalize_interworking_address(target)
+                return behavior.normalize_code_address(target)
     return None
 
 

@@ -1,5 +1,6 @@
 from .addresses import normalize_interworking_address
 from .backend import ArmThumbBackend
+from .behavior import ArmThumbArchitectureBehavior
 from .instruction_kinds import (
     is_block_terminator,
     is_exchange_transfer,
@@ -11,6 +12,7 @@ from .instruction_kinds import (
 )
 
 __all__ = [
+    "ArmThumbArchitectureBehavior",
     "ArmThumbBackend",
     "is_block_terminator",
     "is_exchange_transfer",

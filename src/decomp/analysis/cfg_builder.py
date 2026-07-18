@@ -3,17 +3,11 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Protocol
 
-from decomp.arch.arm_thumb import ArmThumbBackend
-from decomp.arch.arm_thumb.control_flow import (
-    is_link_register_restore,
-    is_pc_return,
-    is_return_to_link_register,
-)
-from decomp.arch.arm_thumb.instruction_kinds import (
-    is_block_terminator,
-    is_function_end_candidate,
-    is_stack_pop,
-    is_unconditional_branch,
+from decomp.arch import (
+    ArchitectureBackend,
+    ArchitectureBehavior,
+    default_architecture_backend,
+    default_architecture_behavior,
 )
 from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
 from decomp.core.flow import EdgeKind
@@ -42,9 +36,9 @@ class InstructionsBufferSource:
 
 
 class LegacyTokenInstructionSource:
-    def __init__(self, legacy_tokens: list[LegacyInstruction], backend: ArmThumbBackend | None = None) -> None:
+    def __init__(self, legacy_tokens: list[LegacyInstruction], backend: ArchitectureBackend | None = None) -> None:
         self.legacy_tokens = legacy_tokens
-        self.backend = backend or ArmThumbBackend()
+        self.backend = backend or default_architecture_backend()
         self.instructions = tuple(
             self.backend.decode_legacy_tokens(tokens)
             for tokens in legacy_tokens
@@ -65,7 +59,12 @@ class LegacyTokenInstructionSource:
         return None
 
 
-def build_control_flow_graph(source: InstructionSource, entry_point: int) -> ControlFlowGraph:
+def build_control_flow_graph(
+    source: InstructionSource,
+    entry_point: int,
+    behavior: ArchitectureBehavior | None = None,
+) -> ControlFlowGraph:
+    architecture = behavior or default_architecture_behavior()
     blocks: dict[int, BasicBlock] = {}
     search_locs = [entry_point]
 
@@ -75,7 +74,7 @@ def build_control_flow_graph(source: InstructionSource, entry_point: int) -> Con
         if search_loc in blocks:
             continue
 
-        block, children = _read_block(source, search_loc)
+        block, children = _read_block(source, search_loc, architecture)
         blocks[search_loc] = _with_outgoing_edges(block, children)
 
         for child in children:
@@ -104,11 +103,15 @@ def cfg_to_legacy_block_graph(cfg: ControlFlowGraph) -> LegacyBlockGraph:
     return LegacyBlockGraph(blocks=index, entry_address=cfg.entry)
 
 
-def _read_block(source: InstructionSource, address: int) -> tuple[BasicBlock, list[int]]:
+def _read_block(
+    source: InstructionSource,
+    address: int,
+    behavior: ArchitectureBehavior,
+) -> tuple[BasicBlock, list[int]]:
     refreshed = False
     while True:
         instructions = source.read_at(address)
-        block_instructions, end_of_function, is_complete = _collect_block_instructions(instructions)
+        block_instructions, end_of_function, is_complete = _collect_block_instructions(instructions, behavior)
 
         if is_complete:
             break
@@ -128,7 +131,10 @@ def _read_block(source: InstructionSource, address: int) -> tuple[BasicBlock, li
     return block, children
 
 
-def _collect_block_instructions(instructions: tuple[Instruction, ...]) -> tuple[list[Instruction], bool, bool]:
+def _collect_block_instructions(
+    instructions: tuple[Instruction, ...],
+    behavior: ArchitectureBehavior,
+) -> tuple[list[Instruction], bool, bool]:
     block = []
     end_of_function = False
     found_block_end = False
@@ -136,23 +142,23 @@ def _collect_block_instructions(instructions: tuple[Instruction, ...]) -> tuple[
     for index, instruction in enumerate(instructions):
         block.append(instruction)
 
-        if is_block_terminator(instruction):
+        if behavior.is_block_terminator(instruction):
             found_block_end = True
             break
 
-        if is_function_end_candidate(instruction):
+        if behavior.is_function_end_candidate(instruction):
             end_of_function = True
-            returns_via_pc = is_pc_return(instruction)
-            restores_link_register = is_link_register_restore(instruction)
-            if returns_via_pc or is_return_to_link_register(instruction):
+            returns_via_pc = behavior.returns_via_program_counter(instruction)
+            restores_link_register = behavior.restores_link_register(instruction)
+            if returns_via_pc or behavior.returns_to_link_register(instruction):
                 break
             if restores_link_register:
                 for tail_instruction in instructions[index + 1:]:
                     block.append(tail_instruction)
-                    if is_unconditional_branch(tail_instruction):
+                    if behavior.is_unconditional_branch(tail_instruction):
                         break
                 break
-            if (is_stack_pop(instruction) and not returns_via_pc) or not restores_link_register:
+            if (behavior.is_stack_pop(instruction) and not returns_via_pc) or not restores_link_register:
                 end_of_function = False
                 continue
 
