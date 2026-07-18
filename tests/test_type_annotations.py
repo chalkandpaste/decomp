@@ -163,6 +163,14 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             ),
             [],
         )
+        self.assertEqual(
+            _function_call_violations(
+                Path("src/decomp/function_signatures.py"),
+                "add_function_sigs",
+                {"successors"},
+            ),
+            [],
+        )
 
     def test_get_function_signature_uses_register_effect_model(self) -> None:
         self.assertEqual(

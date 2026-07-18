@@ -21,14 +21,7 @@ skip_functions = [ 134469972, 134471256, 134469472, 134471424, 134472782, 134455
             # 0x8020244, 0x803af68, 0x8030144, 0x802ff6c, 0x802fd58, 0x803c23c,  ]
 
 def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, bytes]) -> LegacyBlockGraph:
-    search_locs = [block_graph.entry_address]
-
-    seen = {} # only need one pass ever
-
-    while len(search_locs) > 0:
-        loc = search_locs.pop(0)
-        seen[loc] = True
-
+    for loc in block_graph.reachable_order(direction=False):
         block = block_graph.block_at(loc)
         insns = block.instructions
 
@@ -45,12 +38,6 @@ def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, by
 
             new_insns.append(insn)
         block_graph = block_graph.with_block(block.with_instructions(tuple(new_insns)))
-
-        c_locs = block_graph.successors(loc)
-
-        for c in c_locs:
-            if c not in seen and c not in search_locs:
-                search_locs.append(c)
 
     return block_graph
 

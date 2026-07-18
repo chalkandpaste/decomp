@@ -2,11 +2,62 @@ import contextlib
 import io
 import unittest
 
-from decomp.function_signatures import get_function_signature
+from decomp.function_signatures import add_function_sigs, get_function_signature
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 
 
 class FunctionSignatureTests(unittest.TestCase):
+    def test_add_function_sigs_uses_reachable_graph_order(self) -> None:
+        entry = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020004,
+            successors=(0x08020004,),
+            predecessors=(),
+            instructions=(
+                [b"0x8020000", b"4", b"00000000", b"bl", b"0x8030000"],
+            ),
+        )
+        reachable = LegacyBlock(
+            address=0x08020004,
+            end_address=0x08020008,
+            successors=(),
+            predecessors=(entry.address,),
+            instructions=(
+                [b"0x8020004", b"4", b"00000000", b"b.w", b"0x8040000"],
+            ),
+        )
+        unreachable = LegacyBlock(
+            address=0x08020008,
+            end_address=0x0802000C,
+            successors=(),
+            predecessors=(),
+            instructions=(
+                [b"0x8020008", b"4", b"00000000", b"bl", b"0x8050000"],
+            ),
+        )
+        graph = LegacyBlockGraph(
+            entry_address=entry.address,
+            blocks={
+                entry.address: entry,
+                reachable.address: reachable,
+                unreachable.address: unreachable,
+            },
+        )
+
+        updated = add_function_sigs(
+            graph,
+            {
+                0x08030000: b"; void func_0x8030000()",
+                0x08040000: b"; int func_0x8040000()",
+                0x08050000: b"; float func_0x8050000()",
+            },
+        )
+
+        self.assertEqual(updated.block_at(entry.address).instructions[0][-1], b"; void func_0x8030000()")
+        self.assertEqual(updated.block_at(reachable.address).instructions[0][-1], b"; int func_0x8040000()")
+        self.assertEqual(updated.block_at(unreachable.address).instructions, unreachable.instructions)
+        self.assertEqual(graph.block_at(entry.address).instructions, entry.instructions)
+
     def test_detects_integer_return_register_write(self) -> None:
         graph = _single_block_graph(
             [
