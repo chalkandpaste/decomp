@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .block_graph import generate_block_graph
-from .function_signatures import collect_functions, get_function_signature, skip_functions
+from .function_signatures import RegisterSignature, collect_functions, get_function_signature, skip_functions
 from .legacy_types import LegacyBlockGraph
 
 
@@ -51,7 +51,7 @@ def generate_set_of_funcs(binary: bytes, entry_point_loc: int) -> list[int]:
 
 def generate_func_sigs(binary: bytes, entry_point_loc: int) -> dict[int, bytes]:
     discovery = discover_functions(binary, entry_point_loc)
-    func_signatures = {}
+    func_signatures: dict[int, RegisterSignature] = {}
 
     for f in discovery.called_functions():
         block_graph = discovery.block_graphs[f]
@@ -60,37 +60,37 @@ def generate_func_sigs(binary: bytes, entry_point_loc: int) -> dict[int, bytes]:
     func_comments = {}
 
     for f in func_signatures:
-        fs = func_signatures
-        if fs[f][1][b'r3']:
+        signature = func_signatures[f]
+        if signature.argument_scope[b'r3']:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( int r0, int r1, int r2, int r3 )'
-        elif fs[f][1][b'r2']:
+        elif signature.argument_scope[b'r2']:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( int r0, int r1, int r2 )'
-        elif fs[f][1][b'r1']:
+        elif signature.argument_scope[b'r1']:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( int r0, int r1 )'
-        elif fs[f][1][b'r0']:
+        elif signature.argument_scope[b'r0']:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( int r0 )'
-        elif fs[f][1][b's3']:
+        elif signature.argument_scope[b's3']:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( float s0, float s1, float s2, float s3 )'
-        elif fs[f][1][b's2']:
+        elif signature.argument_scope[b's2']:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( float s0, float s1, float s2 )'
-        elif fs[f][1][b's1']:
+        elif signature.argument_scope[b's1']:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b'  ( float s0, float s1 )'
-        elif fs[f][1][b's0']:
+        elif signature.argument_scope[b's0']:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( float s0 )'
-        elif fs[f][1][b'd1']:
+        elif signature.argument_scope[b'd1']:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( double d0, double d1 )'
-        elif fs[f][1][b'd0']:
+        elif signature.argument_scope[b'd0']:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ( double d0 )'
         else:
             args_type = b'func_' + bytes(hex(f), 'utf-8') + b' ()'
 
-        if fs[f][0][b'r1']:
+        if signature.return_scope[b'r1']:
             return_type = b'long '
-        elif fs[f][0][b'r0']:
+        elif signature.return_scope[b'r0']:
             return_type = b'int '
-        elif fs[f][0][b's0']:
+        elif signature.return_scope[b's0']:
             return_type = b'float '
-        elif fs[f][0][b'd0']:
+        elif signature.return_scope[b'd0']:
             return_type = b'double '
         else:
             return_type = b'void '

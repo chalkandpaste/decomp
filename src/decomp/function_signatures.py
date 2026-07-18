@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from .analysis import collect_function_addresses
 from .arch.arm_thumb.register_effects import RegisterEffect, register_effect
 from .core.cfg import ControlFlowGraph
@@ -36,6 +38,12 @@ BACKWARD_REGISTERS = (
 )
 
 
+@dataclass(frozen=True)
+class RegisterSignature:
+    return_scope: LegacyRegisterScope
+    argument_scope: LegacyRegisterScope
+
+
 def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, bytes]) -> LegacyBlockGraph:
     for loc in block_graph.reachable_order(direction=False):
         block = block_graph.block_at(loc)
@@ -61,7 +69,7 @@ def collect_functions(block_graph: LegacyBlockGraph) -> list[int]:
     cfg = legacy_block_graph_to_cfg(block_graph)
     return collect_function_addresses(cfg)
 
-def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegisterScope, LegacyRegisterScope]:
+def get_function_signature(block_graph: LegacyBlockGraph) -> RegisterSignature:
     entry_address = block_graph.entry_address
     print('get_function_signature', hex(entry_address))
 
@@ -73,7 +81,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
 def _get_function_signature_from_cfg(
     cfg: ControlFlowGraph,
     loop_tracker: LoopTracker,
-) -> tuple[LegacyRegisterScope, LegacyRegisterScope]:
+) -> RegisterSignature:
     entry_address = cfg.entry
     loops = {}
 
@@ -179,7 +187,10 @@ def _get_function_signature_from_cfg(
 
     arg_scope = loc_scope[entry_address]
 
-    return return_scope, arg_scope
+    if return_scope is None:
+        return_scope = _initial_forward_scope()
+
+    return RegisterSignature(return_scope=return_scope, argument_scope=arg_scope)
 
 
 def _register_effect_for_instruction(instruction: Instruction) -> RegisterEffect | None:

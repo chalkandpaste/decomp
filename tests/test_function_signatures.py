@@ -2,7 +2,7 @@ import contextlib
 import io
 import unittest
 
-from decomp.function_signatures import add_function_sigs, get_function_signature
+from decomp.function_signatures import RegisterSignature, add_function_sigs, get_function_signature
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 
 
@@ -66,11 +66,11 @@ class FunctionSignatureTests(unittest.TestCase):
             ]
         )
 
-        return_scope, arg_scope = _quiet_signature(graph)
+        signature = _quiet_signature(graph)
 
-        self.assertTrue(return_scope[b"r0"])
-        self.assertFalse(return_scope[b"r1"])
-        self.assertFalse(arg_scope[b"r0"])
+        self.assertTrue(signature.return_scope[b"r0"])
+        self.assertFalse(signature.return_scope[b"r1"])
+        self.assertFalse(signature.argument_scope[b"r0"])
 
     def test_detects_store_input_registers_as_arguments(self) -> None:
         graph = _single_block_graph(
@@ -80,11 +80,11 @@ class FunctionSignatureTests(unittest.TestCase):
             ]
         )
 
-        return_scope, arg_scope = _quiet_signature(graph)
+        signature = _quiet_signature(graph)
 
-        self.assertFalse(return_scope[b"r0"])
-        self.assertTrue(arg_scope[b"r0"])
-        self.assertTrue(arg_scope[b"r1"])
+        self.assertFalse(signature.return_scope[b"r0"])
+        self.assertTrue(signature.argument_scope[b"r0"])
+        self.assertTrue(signature.argument_scope[b"r1"])
 
     def test_merges_arguments_from_multiple_branch_exits(self) -> None:
         entry = LegacyBlock(
@@ -126,12 +126,12 @@ class FunctionSignatureTests(unittest.TestCase):
             },
         )
 
-        _return_scope, arg_scope = _quiet_signature(graph)
+        signature = _quiet_signature(graph)
 
-        self.assertTrue(arg_scope[b"r0"])
-        self.assertTrue(arg_scope[b"r1"])
-        self.assertTrue(arg_scope[b"r2"])
-        self.assertTrue(arg_scope[b"r3"])
+        self.assertTrue(signature.argument_scope[b"r0"])
+        self.assertTrue(signature.argument_scope[b"r1"])
+        self.assertTrue(signature.argument_scope[b"r2"])
+        self.assertTrue(signature.argument_scope[b"r3"])
 
 
 def _single_block_graph(instructions: list[list[object]]) -> LegacyBlockGraph:
@@ -145,7 +145,7 @@ def _single_block_graph(instructions: list[list[object]]) -> LegacyBlockGraph:
     return LegacyBlockGraph(entry_address=block.address, blocks={block.address: block})
 
 
-def _quiet_signature(block_graph: LegacyBlockGraph) -> tuple[dict[bytes, bool], dict[bytes, bool]]:
+def _quiet_signature(block_graph: LegacyBlockGraph) -> RegisterSignature:
     with contextlib.redirect_stdout(io.StringIO()):
         return get_function_signature(block_graph)
 
