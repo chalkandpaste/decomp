@@ -1,4 +1,6 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from .analysis import collect_function_addresses
 from .arch.arm_thumb.register_effects import RegisterEffect, register_effect
@@ -40,8 +42,12 @@ BACKWARD_REGISTERS = (
 
 @dataclass(frozen=True)
 class RegisterSignature:
-    return_scope: LegacyRegisterScope
-    argument_scope: LegacyRegisterScope
+    return_scope: Mapping[bytes, bool]
+    argument_scope: Mapping[bytes, bool]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "return_scope", MappingProxyType(dict(self.return_scope)))
+        object.__setattr__(self, "argument_scope", MappingProxyType(dict(self.argument_scope)))
 
 
 @dataclass(frozen=True)

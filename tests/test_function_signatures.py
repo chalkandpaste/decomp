@@ -151,6 +151,24 @@ class FunctionSignatureTests(unittest.TestCase):
         self.assertEqual(declaration.render(), b"int func_0x8034f48 ( int r0, int r1 )")
         self.assertEqual(declaration.render_comment(), b"; int func_0x8034f48 ( int r0, int r1 )")
 
+    def test_register_signature_scopes_are_read_only(self) -> None:
+        return_scope = _scope((b"r0",))
+        argument_scope = _scope((b"r1",))
+        signature = RegisterSignature(
+            return_scope=return_scope,
+            argument_scope=argument_scope,
+        )
+
+        return_scope[b"r0"] = False
+        argument_scope[b"r1"] = False
+
+        self.assertTrue(signature.return_scope[b"r0"])
+        self.assertTrue(signature.argument_scope[b"r1"])
+        with self.assertRaises(TypeError):
+            signature.return_scope[b"r0"] = False
+        with self.assertRaises(TypeError):
+            signature.argument_scope[b"r1"] = False
+
 
 def _single_block_graph(instructions: list[list[object]]) -> LegacyBlockGraph:
     block = LegacyBlock(
