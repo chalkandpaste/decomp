@@ -10,7 +10,7 @@ from decomp.arch.arm_thumb.control_flow import (
     is_return_to_link_register,
 )
 from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
-from decomp.core.flow import EdgeKind, FlowKind
+from decomp.core.flow import EdgeKind
 from decomp.core.instruction import Instruction
 from decomp.instruction_buffer import InstructionsBuffer
 from decomp.instructions import (
@@ -164,23 +164,10 @@ def _collect_block_instructions(instructions: tuple[Instruction, ...]) -> tuple[
 
 def _children_for_block(instructions: list[Instruction]) -> list[int]:
     last = instructions[-1]
-    flow = last.flow
-
-    if flow.kind == FlowKind.CONDITIONAL_BRANCH:
-        if len(flow.targets) != 1 or flow.fallthrough is None:
-            raise ValueError(f"conditional branch at {hex(last.address)} lacks typed target information")
-        return [flow.targets[0], flow.fallthrough]
-
-    if flow.kind == FlowKind.UNCONDITIONAL_BRANCH:
-        return list(flow.targets)
-
-    if flow.kind == FlowKind.SWITCH:
-        return list(flow.targets)
-
-    if flow.is_function_exit:
-        return []
-
-    return [flow.fallthrough if flow.fallthrough is not None else last.address + last.size]
+    try:
+        return list(last.flow.successor_addresses(last.address + last.size))
+    except ValueError as exc:
+        raise ValueError(f"{exc} at {hex(last.address)}") from exc
 
 
 def _with_outgoing_edges(block: BasicBlock, children: list[int]) -> BasicBlock:

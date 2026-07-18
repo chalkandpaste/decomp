@@ -310,6 +310,14 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             ),
             [],
         )
+        self.assertEqual(
+            _flow_attribute_access_in_function(
+                Path("src/decomp/analysis/cfg_builder.py"),
+                "_children_for_block",
+                {"kind", "targets", "fallthrough", "is_function_exit"},
+            ),
+            [],
+        )
 
     def test_cfg_block_collection_uses_typed_return_predicates(self) -> None:
         self.assertEqual(
@@ -666,6 +674,34 @@ def _attribute_access_in_function(
                     f"{path}:{child.lineno} {function_name} should use {root_name} methods instead of {root_name}.{child.attr}"
                 )
     return violations
+
+
+def _flow_attribute_access_in_function(
+    path: Path,
+    function_name: str,
+    attribute_names: set[str],
+) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Attribute) or child.attr not in attribute_names:
+                continue
+            if _attribute_root_name(child.value) == "flow" or _attribute_chain_contains(child.value, "flow"):
+                violations.append(
+                    f"{path}:{child.lineno} {function_name} should use FlowInfo methods instead of flow.{child.attr}"
+                )
+    return violations
+
+
+def _attribute_chain_contains(node: ast.AST, attribute_name: str) -> bool:
+    while isinstance(node, ast.Attribute):
+        if node.attr == attribute_name:
+            return True
+        node = node.value
+    return False
 
 
 def _legacy_meta_block_graph_constructor_keywords(path: Path) -> list[str]:

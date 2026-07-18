@@ -39,6 +39,20 @@ class FlowInfo:
     is_function_exit: bool = False
     metadata: dict[str, str] = field(default_factory=dict)
 
+    def successor_addresses(self, default_fallthrough: Address) -> tuple[Address, ...]:
+        if self.kind == FlowKind.CONDITIONAL_BRANCH:
+            if len(self.targets) != 1 or self.fallthrough is None:
+                raise ValueError("conditional branch lacks typed target information")
+            return (self.targets[0], self.fallthrough)
+
+        if self.kind in {FlowKind.UNCONDITIONAL_BRANCH, FlowKind.SWITCH}:
+            return self.targets
+
+        if self.is_function_exit:
+            return ()
+
+        return (self.fallthrough if self.fallthrough is not None else default_fallthrough,)
+
     def to_json(self) -> dict[str, object]:
         return {
             "kind": self.kind.value,

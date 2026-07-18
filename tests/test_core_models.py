@@ -1,12 +1,43 @@
 import unittest
 
 from decomp.core.cfg import BasicBlock, ControlFlowGraph
-from decomp.core import EdgeKind, FlowKind
+from decomp.core import EdgeKind, FlowInfo, FlowKind
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 from decomp.legacy_adapter import legacy_block_graph_to_cfg
 
 
 class CoreModelAdapterTests(unittest.TestCase):
+    def test_flow_info_reports_conditional_successors_in_branch_order(self) -> None:
+        flow = FlowInfo(
+            kind=FlowKind.CONDITIONAL_BRANCH,
+            targets=(0x08020010,),
+            fallthrough=0x08020004,
+        )
+
+        self.assertEqual(flow.successor_addresses(0x08020002), (0x08020010, 0x08020004))
+
+    def test_flow_info_rejects_incomplete_conditional_branch_successors(self) -> None:
+        flow = FlowInfo(kind=FlowKind.CONDITIONAL_BRANCH, targets=())
+
+        with self.assertRaisesRegex(ValueError, "conditional branch lacks typed target information"):
+            flow.successor_addresses(0x08020002)
+
+    def test_flow_info_reports_jump_and_switch_targets(self) -> None:
+        jump = FlowInfo(kind=FlowKind.UNCONDITIONAL_BRANCH, targets=(0x08020010,))
+        switch = FlowInfo(kind=FlowKind.SWITCH, targets=(0x08020010, 0x08020020))
+
+        self.assertEqual(jump.successor_addresses(0x08020002), (0x08020010,))
+        self.assertEqual(switch.successor_addresses(0x08020002), (0x08020010, 0x08020020))
+
+    def test_flow_info_reports_fallthrough_and_exits(self) -> None:
+        default_flow = FlowInfo(kind=FlowKind.FALLTHROUGH)
+        explicit_flow = FlowInfo(kind=FlowKind.CALL, fallthrough=0x08020020)
+        exit_flow = FlowInfo(kind=FlowKind.RETURN, is_function_exit=True)
+
+        self.assertEqual(default_flow.successor_addresses(0x08020002), (0x08020002,))
+        self.assertEqual(explicit_flow.successor_addresses(0x08020002), (0x08020020,))
+        self.assertEqual(exit_flow.successor_addresses(0x08020002), ())
+
     def test_converts_legacy_block_graph_to_typed_cfg(self) -> None:
         block = LegacyBlock(
             address=0x08020000,
