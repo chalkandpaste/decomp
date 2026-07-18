@@ -1,5 +1,5 @@
 from .render_asm import generate_asm
-from .function_signatures import generate_set_of_funcs
+from .function_discovery import generate_set_of_funcs
 
 import argparse
 

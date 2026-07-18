@@ -102,7 +102,8 @@ src/decomp/
   project_state.py       SQLite project state
   instruction_buffer.py  rasm2 integration and literal reads
   block_graph.py         basic-block discovery and graph traversal
-  function_signatures.py function signature heuristics and legacy xref wrapper
+  function_discovery.py  recursive function discovery and signature comments
+  function_signatures.py function signature heuristics
   disassemble.py         control-flow structuring
   convert_c.py           instruction-to-C lowering
   reduce_c.py            C AST expression reduction

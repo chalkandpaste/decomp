@@ -108,6 +108,18 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         self.assertEqual(_module_import_violations(function_signatures_path, {"argparse"}), [])
         self.assertEqual(_module_main_guard_violations(function_signatures_path), [])
 
+    def test_function_signatures_stays_out_of_recursive_discovery(self) -> None:
+        function_signatures_path = Path("src/decomp/function_signatures.py")
+
+        self.assertEqual(_module_import_violations(function_signatures_path, {"block_graph"}), [])
+        self.assertEqual(
+            _forbidden_defs(
+                function_signatures_path,
+                {"discover_functions", "generate_func_sigs", "generate_set_of_funcs"},
+            ),
+            [],
+        )
+
     def test_graph_driven_modules_do_not_index_raw_block_maps(self) -> None:
         violations = []
         for path in (

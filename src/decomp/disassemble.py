@@ -1,6 +1,7 @@
 import argparse
 
-from .function_signatures import generate_func_sigs, add_function_sigs
+from .function_discovery import generate_func_sigs
+from .function_signatures import add_function_sigs
 from .block_graph import generate_block_graph
 from .render_c import generate_func_cf_from_graph, generate_func_decl
 from .structure import annotate_graph, simplify_if
