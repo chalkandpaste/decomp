@@ -225,6 +225,24 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_render_c_condition_logic_uses_legacy_instruction_accessors(self) -> None:
+        self.assertEqual(
+            _raw_numeric_subscripts_in_function(
+                Path("src/decomp/render_c.py"),
+                "render_condition",
+                {3, 4, 5},
+            ),
+            [],
+        )
+        self.assertEqual(
+            _raw_numeric_subscripts_in_function(
+                Path("src/decomp/render_c.py"),
+                "generate_func_cf_from_graph",
+                {3, 4, 5},
+            ),
+            [],
+        )
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []

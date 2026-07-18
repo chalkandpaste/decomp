@@ -19,7 +19,8 @@ from .instructions import (
     ncompare,
     tst,
 )
-from .legacy_types import LegacyBlock, LegacyBlockGraph
+from .legacy_instruction import mnemonic, operand_bytes
+from .legacy_types import LegacyBlock, LegacyBlockGraph, LegacyInstruction
 from .meta_blocks import EndBlock, IfBlock, LinearBlock, MetaBlock, MetaBlockGraph, SwitchBlock, WhileBlock
 
 
@@ -85,11 +86,12 @@ def render_condition(
         comp_out = None
         for i in range(len(insns)):
             insn_0 = insns[i]
-            if insn_0[3] in cond_block_end_zero:
+            insn_0_mnemonic = mnemonic(insn_0)
+            if insn_0_mnemonic in cond_block_end_zero:
                 # this changes checks condition (sets NZCV)
                 # and sets PC to the new loc
-                comp_reg = insn_0[4].rstrip(b',')
-                comp = False if insn_0[3] == b'cbz' else True
+                comp_reg = _operand_without_trailing_comma(insn_0, 0)
+                comp = False if insn_0_mnemonic == b'cbz' else True
                 if comp:
                     comp_out = comp_reg + b' == 0'
                 else:
@@ -99,7 +101,7 @@ def render_condition(
                 
                 break
 
-            elif insn_0[3] in cond_block_end:
+            elif insn_0_mnemonic in cond_block_end:
                 # we have the condition but not the operations
                 # so search backwards for the cmp operation
                 # which could either be normal or FP
@@ -107,15 +109,16 @@ def render_condition(
 
                 for j in range(i, len(insns)):
                     insn_1 = insns[j]
-                    if insn_1[3] in compare + ncompare + tst:
-                        comp_reg1 = insn_1[4].rstrip(b',')
-                        comp_reg2 = insn_1[5].lstrip(b'#').rstrip(b',')
-                        comp = insn_0[3]
+                    insn_1_mnemonic = mnemonic(insn_1)
+                    if insn_1_mnemonic in compare + ncompare + tst:
+                        comp_reg1 = _operand_without_trailing_comma(insn_1, 0)
+                        comp_reg2 = _condition_operand(insn_1, 1)
+                        comp = insn_0_mnemonic
                         break
-                    elif insn_1[3] in modifies_NCVZ:
-                        comp_reg1 = crs(insn_1[4])
+                    elif insn_1_mnemonic in modifies_NCVZ:
+                        comp_reg1 = crs(operand_bytes(insn_1, 0))
                         comp_reg2 = b'0'
-                        comp = insn_0[3]
+                        comp = insn_0_mnemonic
                         break
                     
                 nzcv_set = None
@@ -125,14 +128,19 @@ def render_condition(
                     for j in range(i, len(insns)):
                         insn_1 = insns[j]
                         print(insn_1)
+                        insn_1_mnemonic = mnemonic(insn_1)
                     
-                        if insn_1[3] == b'vmrs' and insn_1[4] == b'APSR_nzcv,' and insn_1[5] == b'fpscr':
+                        if (
+                            insn_1_mnemonic == b'vmrs' and
+                            operand_bytes(insn_1, 0) == b'APSR_nzcv,' and
+                            operand_bytes(insn_1, 1) == b'fpscr'
+                        ):
                             nzcv_set = True
 
-                        if insn_1[3] in fp_compare and nzcv_set:
-                            comp_reg1 = insn_1[4].rstrip(b',')
-                            comp_reg2 = insn_1[5].lstrip(b'#').rstrip(b',')
-                            comp = insn_0[3]
+                        if insn_1_mnemonic in fp_compare and nzcv_set:
+                            comp_reg1 = _operand_without_trailing_comma(insn_1, 0)
+                            comp_reg2 = _condition_operand(insn_1, 1)
+                            comp = insn_0_mnemonic
                     
                     if nzcv_set is None:
                         nzcv_set = False
@@ -243,7 +251,7 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
             block_out = b'\n'.join([print_block(block) for block in meta_block_graph.source_blocks_at(node.preface)])
 
             switch_insn = meta_block_graph.source_block_at(node.preface[-1]).instructions[-1]
-            switch_var = crs(switch_insn[5])
+            switch_var = crs(operand_bytes(switch_insn, 1))
 
 
             out += block_out + b'\nswitch(' + switch_var + b') \n{\n' + c_out + b'\n}\n'
@@ -334,3 +342,11 @@ def generate_func_decl(block_graph: LegacyBlockGraph) -> bytes:
         return_type = b'void '
 
     return return_type + args_type
+
+
+def _operand_without_trailing_comma(instruction: LegacyInstruction, index: int) -> bytes:
+    return operand_bytes(instruction, index).rstrip(b',')
+
+
+def _condition_operand(instruction: LegacyInstruction, index: int) -> bytes:
+    return operand_bytes(instruction, index).lstrip(b'#').rstrip(b',')
