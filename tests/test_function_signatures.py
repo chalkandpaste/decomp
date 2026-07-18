@@ -86,6 +86,53 @@ class FunctionSignatureTests(unittest.TestCase):
         self.assertTrue(arg_scope[b"r0"])
         self.assertTrue(arg_scope[b"r1"])
 
+    def test_merges_arguments_from_multiple_branch_exits(self) -> None:
+        entry = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020004,
+            successors=(0x08020008, 0x08020004),
+            predecessors=(),
+            instructions=(
+                [b"0x8020000", b"2", b"0000", b"cmp", b"r0,", b"0"],
+                [b"0x8020002", b"2", b"0000", b"beq", b"0x8020008"],
+            ),
+        )
+        false_block = LegacyBlock(
+            address=0x08020004,
+            end_address=0x08020008,
+            successors=(),
+            predecessors=(entry.address,),
+            instructions=(
+                [b"0x8020004", b"2", b"0000", b"str", b"r1,", b"[r3,", b"0]"],
+                [b"0x8020006", b"2", b"0000", b"bx", b"lr"],
+            ),
+        )
+        true_block = LegacyBlock(
+            address=0x08020008,
+            end_address=0x0802000C,
+            successors=(),
+            predecessors=(entry.address,),
+            instructions=(
+                [b"0x8020008", b"2", b"0000", b"str", b"r2,", b"[r3,", b"0]"],
+                [b"0x802000a", b"2", b"0000", b"bx", b"lr"],
+            ),
+        )
+        graph = LegacyBlockGraph(
+            entry_address=entry.address,
+            blocks={
+                entry.address: entry,
+                false_block.address: false_block,
+                true_block.address: true_block,
+            },
+        )
+
+        _return_scope, arg_scope = _quiet_signature(graph)
+
+        self.assertTrue(arg_scope[b"r0"])
+        self.assertTrue(arg_scope[b"r1"])
+        self.assertTrue(arg_scope[b"r2"])
+        self.assertTrue(arg_scope[b"r3"])
+
 
 def _single_block_graph(instructions: list[list[object]]) -> LegacyBlockGraph:
     block = LegacyBlock(

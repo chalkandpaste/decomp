@@ -20,6 +20,23 @@ skip_functions = [ 134469972, 134471256, 134469472, 134471424, 134472782, 134455
             # 0x803c29c, 0x803adc8, 0x803d7dc, 0x803af48, 0x803af28, 0x8020688, 0x803c222, 0x803d440, 0x803aec0,
             # 0x8020244, 0x803af68, 0x8030144, 0x802ff6c, 0x802fd58, 0x803c23c,  ]
 
+FORWARD_REGISTERS = (b'r0', b'r1', b's0', b'd0')
+BACKWARD_REGISTERS = (
+    b'r0',
+    b'r1',
+    b'r2',
+    b'r3',
+    b's0',
+    b's1',
+    b's2',
+    b's3',
+    b'd0',
+    b'd1',
+    b'd2',
+    b'd3',
+)
+
+
 def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, bytes]) -> LegacyBlockGraph:
     for loc in block_graph.reachable_order(direction=False):
         block = block_graph.block_at(loc)
@@ -63,10 +80,10 @@ def _get_function_signature_from_cfg(
 
     search_locs = [entry_address]
 
-    init_forward_scope = {b'r0' : False, b'r1': False, b's0' : False, b'd0': False}
+    init_forward_scope = _initial_forward_scope()
     
     # mapping from loc to scope, to be updated
-    loc_scope = {search_locs[0] : init_forward_scope}
+    loc_scope = {search_locs[0] : init_forward_scope.copy()}
     
     ends = []
 
@@ -101,11 +118,7 @@ def _get_function_signature_from_cfg(
                 if c not in loc_scope:
                     loc_scope[c] = scope.copy()
                 else:
-                    new_scope = scope.copy()
-                    prev_scope = loc_scope[c]
-                    for k in init_forward_scope:
-                        if prev_scope[k] or scope[k]:
-                            new_scope[k] = True
+                    loc_scope[c] = _merge_register_scopes(loc_scope[c], scope, FORWARD_REGISTERS)
                         
                 if c not in loops:
                     search_locs.append(c)
@@ -126,14 +139,10 @@ def _get_function_signature_from_cfg(
 
     search_locs = ends
 
-    init_backward_scope = {
-            b'r0' : False, b'r1' : False, b'r2' : False, b'r3' : False,
-            b's0' : False, b's1' : False, b's2' : False, b's3' : False,
-            b'd0' : False, b'd1' : False, b'd2' : False, b'd3' : False
-            }
+    init_backward_scope = _initial_backward_scope()
     
     # mapping from loc to scope, to be updated
-    loc_scope = { loc : init_backward_scope for loc in search_locs }
+    loc_scope = {loc: init_backward_scope.copy() for loc in search_locs}
     
     while len(search_locs) > 0:
         loc = search_locs.pop(0)
@@ -163,11 +172,7 @@ def _get_function_signature_from_cfg(
             if p not in loc_scope:
                 loc_scope[p] = scope.copy()
             else:
-                new_scope = scope.copy()
-                prev_scope = loc_scope[p]
-                for k in init_backward_scope:
-                    if prev_scope[k] or scope[k]:
-                        new_scope[k] = True
+                loc_scope[p] = _merge_register_scopes(loc_scope[p], scope, BACKWARD_REGISTERS)
                     
             if p not in loops:
                 search_locs.append(p)
@@ -180,6 +185,26 @@ def _get_function_signature_from_cfg(
 
 def _register_effect_for_instruction(instruction: Instruction) -> RegisterEffect | None:
     return register_effect(instruction)
+
+
+def _initial_forward_scope() -> LegacyRegisterScope:
+    return {register: False for register in FORWARD_REGISTERS}
+
+
+def _initial_backward_scope() -> LegacyRegisterScope:
+    return {register: False for register in BACKWARD_REGISTERS}
+
+
+def _merge_register_scopes(
+    previous_scope: LegacyRegisterScope,
+    current_scope: LegacyRegisterScope,
+    registers: tuple[bytes, ...],
+) -> LegacyRegisterScope:
+    merged = current_scope.copy()
+    for register in registers:
+        if previous_scope[register] or current_scope[register]:
+            merged[register] = True
+    return merged
 
 
 def _apply_forward_register_effect(scope: LegacyRegisterScope, effect: RegisterEffect) -> None:
