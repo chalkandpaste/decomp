@@ -364,7 +364,13 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         self.assertEqual(
             _imported_name_violations(
                 Path("src/decomp/instruction_buffer.py"),
-                {"ArmThumbBackend"},
+                {
+                    "ArmThumbBackend",
+                    "fix_jump_offset",
+                    "is_probable_address_literal",
+                    "normalize_rasm2_output",
+                    "twos_complement",
+                },
             ),
             [],
         )

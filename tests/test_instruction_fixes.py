@@ -4,8 +4,9 @@ import unittest
 from decomp import convert_c
 from decomp import instructions
 from decomp.arch.arm_thumb import ArmThumbBackend
+from decomp.arch.arm_thumb.backend import is_probable_address_literal
 from decomp.core import FlowKind
-from decomp.instruction_buffer import InstructionsBuffer, disassemble_section, is_probable_address_literal
+from decomp.instruction_buffer import InstructionsBuffer, disassemble_section
 
 
 class FixtureBackend(ArmThumbBackend):

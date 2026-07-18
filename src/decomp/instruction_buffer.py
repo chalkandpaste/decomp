@@ -1,10 +1,4 @@
 from .arch import ArchitectureBackend, default_architecture_backend
-from .arch.arm_thumb.backend import (
-    fix_jump_offset,
-    is_probable_address_literal,
-    normalize_rasm2_output,
-    twos_complement,
-)
 from .core.instruction import Instruction
 from .legacy_types import LegacyInstruction
 
