@@ -3,7 +3,7 @@ import io
 import unittest
 
 from decomp.block_graph import generate_block_graph
-from decomp.legacy_types import LegacyBlock
+from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 from decomp.meta_blocks import EndBlock, MetaBlockGraph
 from decomp.structure import annotate_graph
 
@@ -45,6 +45,27 @@ class MetaBlockTests(unittest.TestCase):
 
         self.assertIs(graph.source_block_at(block.address), block)
         self.assertEqual(graph.block_index, graph.source_blocks)
+
+    def test_meta_block_graph_can_be_built_from_legacy_graph(self) -> None:
+        block = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020002,
+            instructions=(),
+            successors=(),
+            predecessors=(),
+        )
+        source_graph = LegacyBlockGraph(
+            blocks={block.address: block},
+            entry_address=block.address,
+        )
+
+        graph = MetaBlockGraph.from_legacy_graph(
+            block_graph=source_graph,
+            meta_blocks={},
+            entry_address=block.address,
+        )
+
+        self.assertIs(graph.source_block_at(block.address), block)
 
 
 if __name__ == "__main__":

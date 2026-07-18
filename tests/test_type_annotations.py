@@ -72,6 +72,7 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             Path("src/decomp/function_signatures.py"),
             Path("src/decomp/legacy_adapter.py"),
             Path("src/decomp/render_c.py"),
+            Path("src/decomp/structure.py"),
         ):
             violations.extend(_raw_graph_storage_access(path))
 
