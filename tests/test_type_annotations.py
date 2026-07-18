@@ -321,6 +321,20 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
     def test_cfg_block_collection_uses_typed_return_predicates(self) -> None:
         self.assertEqual(
+            _exact_import_violations(
+                Path("src/decomp/analysis/cfg_builder.py"),
+                {"decomp.instructions"},
+            ),
+            [],
+        )
+        self.assertEqual(
+            _forbidden_defs(
+                Path("src/decomp/analysis/cfg_builder.py"),
+                {"_mnemonic"},
+            ),
+            [],
+        )
+        self.assertEqual(
             _function_call_violations(
                 Path("src/decomp/analysis/cfg_builder.py"),
                 "_collect_block_instructions",

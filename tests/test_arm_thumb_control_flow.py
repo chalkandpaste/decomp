@@ -8,9 +8,13 @@ from decomp.arch.arm_thumb.control_flow import (
     is_return_to_link_register,
 )
 from decomp.arch.arm_thumb.instruction_kinds import (
+    is_block_terminator,
     is_exchange_transfer,
+    is_function_end_candidate,
     is_move_to_register,
     is_register_restore,
+    is_stack_pop,
+    is_unconditional_branch,
 )
 
 
@@ -63,6 +67,24 @@ class ArmThumbControlFlowTests(unittest.TestCase):
         restore = self.backend.decode_legacy_tokens([b"0x8020000", b"2", b"0000", b"pop", b"{r4,", b"lr}"])
 
         self.assertTrue(is_register_restore(restore))
+
+    def test_classifies_cfg_block_boundary_instructions(self) -> None:
+        beq = self.backend.decode_legacy_tokens([b"0x8020000", b"2", b"0000", b"beq", b"0x8020008"])
+        branch = self.backend.decode_legacy_tokens([b"0x8020002", b"2", b"0000", b"b", b"0x8020010"])
+
+        self.assertTrue(is_block_terminator(beq))
+        self.assertTrue(is_block_terminator(branch))
+        self.assertTrue(is_unconditional_branch(branch))
+        self.assertFalse(is_unconditional_branch(beq))
+
+    def test_classifies_function_end_candidates(self) -> None:
+        pop = self.backend.decode_legacy_tokens([b"0x8020000", b"2", b"0000", b"pop", b"{r4,", b"lr}"])
+        bx = self.backend.decode_legacy_tokens([b"0x8020002", b"2", b"0000", b"bx", b"lr"])
+
+        self.assertTrue(is_function_end_candidate(pop))
+        self.assertTrue(is_function_end_candidate(bx))
+        self.assertTrue(is_stack_pop(pop))
+        self.assertFalse(is_stack_pop(bx))
 
     def test_classifies_register_move_instructions(self) -> None:
         move = self.backend.decode_legacy_tokens([b"0x8020000", b"2", b"0000", b"mov", b"r0,", b"0x8034f49"])

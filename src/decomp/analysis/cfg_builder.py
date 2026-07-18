@@ -9,16 +9,16 @@ from decomp.arch.arm_thumb.control_flow import (
     is_pc_return,
     is_return_to_link_register,
 )
+from decomp.arch.arm_thumb.instruction_kinds import (
+    is_block_terminator,
+    is_function_end_candidate,
+    is_stack_pop,
+    is_unconditional_branch,
+)
 from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
 from decomp.core.flow import EdgeKind
 from decomp.core.instruction import Instruction
 from decomp.instruction_buffer import InstructionsBuffer
-from decomp.instructions import (
-    block_end,
-    exchange_return,
-    func_end,
-    uncond_block_end,
-)
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph, LegacyInstruction
 
 
@@ -134,14 +134,13 @@ def _collect_block_instructions(instructions: tuple[Instruction, ...]) -> tuple[
     found_block_end = False
 
     for index, instruction in enumerate(instructions):
-        mnemonic = _mnemonic(instruction)
         block.append(instruction)
 
-        if mnemonic in block_end:
+        if is_block_terminator(instruction):
             found_block_end = True
             break
 
-        if mnemonic in func_end + exchange_return:
+        if is_function_end_candidate(instruction):
             end_of_function = True
             returns_via_pc = is_pc_return(instruction)
             restores_link_register = is_link_register_restore(instruction)
@@ -150,10 +149,10 @@ def _collect_block_instructions(instructions: tuple[Instruction, ...]) -> tuple[
             if restores_link_register:
                 for tail_instruction in instructions[index + 1:]:
                     block.append(tail_instruction)
-                    if _mnemonic(tail_instruction) in uncond_block_end:
+                    if is_unconditional_branch(tail_instruction):
                         break
                 break
-            if (mnemonic == b"pop" and not returns_via_pc) or not restores_link_register:
+            if (is_stack_pop(instruction) and not returns_via_pc) or not restores_link_register:
                 end_of_function = False
                 continue
 
@@ -267,7 +266,3 @@ def _legacy_tokens(instruction: Instruction) -> LegacyInstruction:
     if instruction.legacy_tokens:
         return list(instruction.legacy_tokens)
     return list(instruction.raw_tokens)
-
-
-def _mnemonic(instruction: Instruction) -> bytes:
-    return instruction.mnemonic.encode("ascii")
