@@ -75,6 +75,9 @@ class LegacyBlockGraph:
     def block_at(self, address: int) -> LegacyBlock:
         return self.blocks[address]
 
+    def addresses(self) -> tuple[int, ...]:
+        return tuple(self.blocks.keys())
+
     def successors(self, address: int) -> tuple[int, ...]:
         return self.block_at(address).successors
 
@@ -141,4 +144,4 @@ class LegacyConvertedSection:
         return isinstance(key, str) and hasattr(self, key)
 
 
-LegacyTraversalFn: TypeAlias = Callable[[LegacyBlock, LegacyBlockIndex, object], object]
+LegacyTraversalFn: TypeAlias = Callable[[LegacyBlock, LegacyBlockGraph, object], object]

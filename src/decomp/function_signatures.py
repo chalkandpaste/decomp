@@ -1,4 +1,4 @@
-from .block_graph import generate_block_graph, recurse_graph
+from .block_graph import generate_block_graph
 from .analysis import collect_function_addresses
 from .legacy_adapter import legacy_block_graph_to_cfg
 from .legacy_types import LegacyBlockGraph, LegacyRegisterScope

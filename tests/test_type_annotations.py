@@ -55,6 +55,7 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
     def test_graph_driven_modules_do_not_index_raw_block_maps(self) -> None:
         violations = []
         for path in (
+            Path("src/decomp/block_graph.py"),
             Path("src/decomp/function_signatures.py"),
             Path("src/decomp/render_c.py"),
             Path("src/decomp/structure.py"),

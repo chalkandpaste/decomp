@@ -9,7 +9,6 @@ from .analysis.cfg_builder import (
 from .legacy_types import (
     LegacyBlock,
     LegacyBlockGraph,
-    LegacyBlockIndex,
     LegacyInstruction,
     LegacyTraversalFn,
 )
@@ -103,13 +102,11 @@ def mk_block(
             )
 
 def recurse_graph(block_graph: LegacyBlockGraph, f: LegacyTraversalFn, base_case: object, direction: bool) -> object:
-    start_block = block_graph.start_block
-    block_index = block_graph.blocks
-    return recurse_blocks(start_block, block_index, f, base_case, direction)
+    return recurse_blocks(block_graph, block_graph.entry_address, f, base_case, direction)
 
 def recurse_blocks(
-    block: LegacyBlock,
-    block_index: LegacyBlockIndex,
+    block_graph: LegacyBlockGraph,
+    start_address: int,
     f: LegacyTraversalFn,
     base_case: object,
     direction: bool,
@@ -117,21 +114,21 @@ def recurse_blocks(
 
     out = base_case
 
-    retrace_nodes = [block]
+    retrace_nodes = [block_graph.block_at(start_address)]
 
     # mark them false as we proceed through, faster than lists
-    tally = { i : True for i in block_index }
+    tally = { i : True for i in block_graph.addresses() }
 
     direction = -1 if direction else 0
 
     while len(retrace_nodes) > 0:
         curr_block = retrace_nodes.pop(direction)
-        children = [block_index[i] for i in curr_block.successors]
+        children = [block_graph.block_at(i) for i in curr_block.successors]
 
         tally[curr_block.address] = False # visited
 
         # do thing
-        out = f(curr_block, block_index, out)
+        out = f(curr_block, block_graph, out)
 
     
         # get it ready for the next iteration
@@ -187,16 +184,14 @@ def generate_block_graph(
     return block_graph
 
 def print_block_graph(block_graph: LegacyBlockGraph) -> bytes:
-    block_index = block_graph.blocks
-
-    locs = [k for k in block_index.keys()]
+    locs = list(block_graph.addresses())
 
     locs.sort()
 
     out = []
 
     for l in locs:
-        block = block_index[l].instructions
+        block = block_graph.block_at(l).instructions
         out += block
 
     out2 = []
