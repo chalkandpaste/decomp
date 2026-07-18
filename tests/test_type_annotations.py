@@ -347,6 +347,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_parity_uses_control_flow_graph_methods(self) -> None:
+        self.assertEqual(
+            _attribute_access_violations(
+                Path("src/decomp/parity.py"),
+                "cfg",
+                {"blocks"},
+            ),
+            [],
+        )
+
     def test_render_c_condition_logic_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _raw_numeric_subscripts_in_function(

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .block_graph import generate_block_graph
+from .core.cfg import ControlFlowGraph
 from .function_signatures import collect_functions, skip_functions
 from .legacy_adapter import legacy_block_graph_to_cfg
 
@@ -209,16 +210,20 @@ def _capture_function(binary: bytes, address: int, *, quiet: bool) -> FunctionFi
         address=address,
         status="ok",
         calls=tuple(sorted(set(calls))),
-        blocks=tuple(
-            BlockFingerprint(
-                address=block.address,
-                end=block.end,
-                instruction_count=len(block.instructions),
-                outgoing=tuple(edge.target for edge in block.outgoing),
-                incoming=tuple(edge.source for edge in block.incoming),
-            )
-            for block in (cfg.blocks[address] for address in sorted(cfg.blocks))
-        ),
+        blocks=_block_fingerprints(cfg),
+    )
+
+
+def _block_fingerprints(cfg: ControlFlowGraph) -> tuple[BlockFingerprint, ...]:
+    return tuple(
+        BlockFingerprint(
+            address=block.address,
+            end=block.end,
+            instruction_count=len(block.instructions),
+            outgoing=tuple(edge.target for edge in block.outgoing),
+            incoming=tuple(edge.source for edge in block.incoming),
+        )
+        for block in (cfg.block_at(address) for address in cfg.block_starts())
     )
 
 
