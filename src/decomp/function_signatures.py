@@ -38,21 +38,6 @@ BACKWARD_REGISTERS = (
     b'd2',
     b'd3',
 )
-ARGUMENT_DECLARATION_PRIORITY = (
-    b'r3',
-    b'r2',
-    b'r1',
-    b'r0',
-    b's3',
-    b's2',
-    b's1',
-    b's0',
-    b'd1',
-    b'd0',
-)
-RETURN_DECLARATION_PRIORITY = (b'r1', b'r0', b's0', b'd0')
-
-
 @dataclass(frozen=True)
 class RegisterScope:
     _values: Mapping[bytes, bool]
@@ -72,6 +57,40 @@ class RegisterScope:
             if self.uses(register):
                 return register
         return None
+
+
+@dataclass(frozen=True)
+class ArgumentDeclaration:
+    highest_register: bytes
+    prototype_suffix: bytes
+
+
+@dataclass(frozen=True)
+class ReturnDeclaration:
+    register: bytes
+    return_type: bytes
+
+
+ARGUMENT_DECLARATIONS = (
+    ArgumentDeclaration(b'r3', b' ( int r0, int r1, int r2, int r3 )'),
+    ArgumentDeclaration(b'r2', b' ( int r0, int r1, int r2 )'),
+    ArgumentDeclaration(b'r1', b' ( int r0, int r1 )'),
+    ArgumentDeclaration(b'r0', b' ( int r0 )'),
+    ArgumentDeclaration(b's3', b' ( float s0, float s1, float s2, float s3 )'),
+    ArgumentDeclaration(b's2', b' ( float s0, float s1, float s2 )'),
+    ArgumentDeclaration(b's1', b'  ( float s0, float s1 )'),
+    ArgumentDeclaration(b's0', b' ( float s0 )'),
+    ArgumentDeclaration(b'd1', b' ( double d0, double d1 )'),
+    ArgumentDeclaration(b'd0', b' ( double d0 )'),
+)
+RETURN_DECLARATIONS = (
+    ReturnDeclaration(b'r1', b'long '),
+    ReturnDeclaration(b'r0', b'int '),
+    ReturnDeclaration(b's0', b'float '),
+    ReturnDeclaration(b'd0', b'double '),
+)
+ARGUMENT_DECLARATION_PRIORITY = tuple(declaration.highest_register for declaration in ARGUMENT_DECLARATIONS)
+RETURN_DECLARATION_PRIORITY = tuple(declaration.register for declaration in RETURN_DECLARATIONS)
 
 
 @dataclass(frozen=True)
@@ -136,40 +155,10 @@ def render_function_declaration(signature: RegisterSignature, address: int) -> F
     return_scope = _register_scope(signature.return_scope)
     argument_register = argument_scope.first_used(ARGUMENT_DECLARATION_PRIORITY)
     return_register = return_scope.first_used(RETURN_DECLARATION_PRIORITY)
-
-    if argument_register == b'r3':
-        prototype = function_name + b' ( int r0, int r1, int r2, int r3 )'
-    elif argument_register == b'r2':
-        prototype = function_name + b' ( int r0, int r1, int r2 )'
-    elif argument_register == b'r1':
-        prototype = function_name + b' ( int r0, int r1 )'
-    elif argument_register == b'r0':
-        prototype = function_name + b' ( int r0 )'
-    elif argument_register == b's3':
-        prototype = function_name + b' ( float s0, float s1, float s2, float s3 )'
-    elif argument_register == b's2':
-        prototype = function_name + b' ( float s0, float s1, float s2 )'
-    elif argument_register == b's1':
-        prototype = function_name + b'  ( float s0, float s1 )'
-    elif argument_register == b's0':
-        prototype = function_name + b' ( float s0 )'
-    elif argument_register == b'd1':
-        prototype = function_name + b' ( double d0, double d1 )'
-    elif argument_register == b'd0':
-        prototype = function_name + b' ( double d0 )'
-    else:
-        prototype = function_name + b' ()'
-
-    if return_register == b'r1':
-        return_type = b'long '
-    elif return_register == b'r0':
-        return_type = b'int '
-    elif return_register == b's0':
-        return_type = b'float '
-    elif return_register == b'd0':
-        return_type = b'double '
-    else:
-        return_type = b'void '
+    argument_declaration = _argument_declaration(argument_register)
+    return_declaration = _return_declaration(return_register)
+    prototype = function_name + argument_declaration.prototype_suffix
+    return_type = return_declaration.return_type
 
     return FunctionDeclaration(return_type=return_type, prototype=prototype)
 
@@ -297,6 +286,20 @@ def _register_scope(scope: RegisterScope | Mapping[bytes, bool]) -> RegisterScop
     if isinstance(scope, RegisterScope):
         return scope
     return RegisterScope.from_mapping(scope)
+
+
+def _argument_declaration(register: bytes | None) -> ArgumentDeclaration:
+    for declaration in ARGUMENT_DECLARATIONS:
+        if declaration.highest_register == register:
+            return declaration
+    return ArgumentDeclaration(highest_register=b'', prototype_suffix=b' ()')
+
+
+def _return_declaration(register: bytes | None) -> ReturnDeclaration:
+    for declaration in RETURN_DECLARATIONS:
+        if declaration.register == register:
+            return declaration
+    return ReturnDeclaration(register=b'', return_type=b'void ')
 
 
 def _initial_forward_scope() -> LegacyRegisterScope:

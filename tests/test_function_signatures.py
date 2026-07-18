@@ -3,9 +3,11 @@ import io
 import unittest
 
 from decomp.function_signatures import (
+    ArgumentDeclaration,
     FunctionDeclaration,
     RegisterScope,
     RegisterSignature,
+    ReturnDeclaration,
     add_function_sigs,
     get_function_signature,
     render_function_declaration,
@@ -151,6 +153,41 @@ class FunctionSignatureTests(unittest.TestCase):
         self.assertIsInstance(declaration, FunctionDeclaration)
         self.assertEqual(declaration.render(), b"int func_0x8034f48 ( int r0, int r1 )")
         self.assertEqual(declaration.render_comment(), b"; int func_0x8034f48 ( int r0, int r1 )")
+
+    def test_render_function_declaration_uses_highest_argument_register(self) -> None:
+        signature = RegisterSignature(
+            return_scope=_scope(()),
+            argument_scope=_scope((b"r0", b"r2")),
+        )
+
+        declaration = render_function_declaration(signature, 0x08034F48)
+
+        self.assertEqual(declaration.render(), b"void func_0x8034f48 ( int r0, int r1, int r2 )")
+
+    def test_render_function_declaration_defaults_to_void_no_args(self) -> None:
+        signature = RegisterSignature(
+            return_scope=_scope(()),
+            argument_scope=_scope(()),
+        )
+
+        declaration = render_function_declaration(signature, 0x08034F48)
+
+        self.assertEqual(declaration.render(), b"void func_0x8034f48 ()")
+
+    def test_declaration_conventions_are_named_records(self) -> None:
+        argument = ArgumentDeclaration(
+            highest_register=b"r1",
+            prototype_suffix=b" ( int r0, int r1 )",
+        )
+        return_value = ReturnDeclaration(
+            register=b"r0",
+            return_type=b"int ",
+        )
+
+        self.assertEqual(argument.highest_register, b"r1")
+        self.assertEqual(argument.prototype_suffix, b" ( int r0, int r1 )")
+        self.assertEqual(return_value.register, b"r0")
+        self.assertEqual(return_value.return_type, b"int ")
 
     def test_register_signature_scopes_are_read_only(self) -> None:
         return_scope = _scope((b"r0",))
