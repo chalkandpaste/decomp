@@ -38,16 +38,50 @@ BACKWARD_REGISTERS = (
     b'd2',
     b'd3',
 )
+ARGUMENT_DECLARATION_PRIORITY = (
+    b'r3',
+    b'r2',
+    b'r1',
+    b'r0',
+    b's3',
+    b's2',
+    b's1',
+    b's0',
+    b'd1',
+    b'd0',
+)
+RETURN_DECLARATION_PRIORITY = (b'r1', b'r0', b's0', b'd0')
+
+
+@dataclass(frozen=True)
+class RegisterScope:
+    _values: Mapping[bytes, bool]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_values", MappingProxyType(dict(self._values)))
+
+    @classmethod
+    def from_mapping(cls, values: Mapping[bytes, bool]) -> "RegisterScope":
+        return cls(values)
+
+    def uses(self, register: bytes) -> bool:
+        return self._values[register]
+
+    def first_used(self, registers: tuple[bytes, ...]) -> bytes | None:
+        for register in registers:
+            if self.uses(register):
+                return register
+        return None
 
 
 @dataclass(frozen=True)
 class RegisterSignature:
-    return_scope: Mapping[bytes, bool]
-    argument_scope: Mapping[bytes, bool]
+    return_scope: RegisterScope | Mapping[bytes, bool]
+    argument_scope: RegisterScope | Mapping[bytes, bool]
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "return_scope", MappingProxyType(dict(self.return_scope)))
-        object.__setattr__(self, "argument_scope", MappingProxyType(dict(self.argument_scope)))
+        object.__setattr__(self, "return_scope", _register_scope(self.return_scope))
+        object.__setattr__(self, "argument_scope", _register_scope(self.argument_scope))
 
 
 @dataclass(frozen=True)
@@ -98,37 +132,41 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> RegisterSignature:
 
 def render_function_declaration(signature: RegisterSignature, address: int) -> FunctionDeclaration:
     function_name = b'func_' + bytes(hex(address), 'utf-8')
+    argument_scope = _register_scope(signature.argument_scope)
+    return_scope = _register_scope(signature.return_scope)
+    argument_register = argument_scope.first_used(ARGUMENT_DECLARATION_PRIORITY)
+    return_register = return_scope.first_used(RETURN_DECLARATION_PRIORITY)
 
-    if signature.argument_scope[b'r3']:
+    if argument_register == b'r3':
         prototype = function_name + b' ( int r0, int r1, int r2, int r3 )'
-    elif signature.argument_scope[b'r2']:
+    elif argument_register == b'r2':
         prototype = function_name + b' ( int r0, int r1, int r2 )'
-    elif signature.argument_scope[b'r1']:
+    elif argument_register == b'r1':
         prototype = function_name + b' ( int r0, int r1 )'
-    elif signature.argument_scope[b'r0']:
+    elif argument_register == b'r0':
         prototype = function_name + b' ( int r0 )'
-    elif signature.argument_scope[b's3']:
+    elif argument_register == b's3':
         prototype = function_name + b' ( float s0, float s1, float s2, float s3 )'
-    elif signature.argument_scope[b's2']:
+    elif argument_register == b's2':
         prototype = function_name + b' ( float s0, float s1, float s2 )'
-    elif signature.argument_scope[b's1']:
+    elif argument_register == b's1':
         prototype = function_name + b'  ( float s0, float s1 )'
-    elif signature.argument_scope[b's0']:
+    elif argument_register == b's0':
         prototype = function_name + b' ( float s0 )'
-    elif signature.argument_scope[b'd1']:
+    elif argument_register == b'd1':
         prototype = function_name + b' ( double d0, double d1 )'
-    elif signature.argument_scope[b'd0']:
+    elif argument_register == b'd0':
         prototype = function_name + b' ( double d0 )'
     else:
         prototype = function_name + b' ()'
 
-    if signature.return_scope[b'r1']:
+    if return_register == b'r1':
         return_type = b'long '
-    elif signature.return_scope[b'r0']:
+    elif return_register == b'r0':
         return_type = b'int '
-    elif signature.return_scope[b's0']:
+    elif return_register == b's0':
         return_type = b'float '
-    elif signature.return_scope[b'd0']:
+    elif return_register == b'd0':
         return_type = b'double '
     else:
         return_type = b'void '
@@ -253,6 +291,12 @@ def _get_function_signature_from_cfg(
 
 def _register_effect_for_instruction(instruction: Instruction) -> RegisterEffect | None:
     return register_effect(instruction)
+
+
+def _register_scope(scope: RegisterScope | Mapping[bytes, bool]) -> RegisterScope:
+    if isinstance(scope, RegisterScope):
+        return scope
+    return RegisterScope.from_mapping(scope)
 
 
 def _initial_forward_scope() -> LegacyRegisterScope:

@@ -270,6 +270,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_function_declarations_use_register_scope_methods(self) -> None:
+        self.assertEqual(
+            _raw_attribute_subscripts_in_function(
+                Path("src/decomp/function_signatures.py"),
+                "render_function_declaration",
+                {"argument_scope", "return_scope"},
+            ),
+            [],
+        )
+
     def test_typed_function_signature_traversal_stays_off_legacy_decode(self) -> None:
         self.assertEqual(
             _function_call_violations(
@@ -745,6 +755,20 @@ def _raw_numeric_subscripts_in_function(path: Path, function_name: str, indexes:
                 continue
             if child.slice.value in indexes:
                 violations.append(f"{path}:{child.lineno} {function_name} should use legacy_instruction accessors")
+    return violations
+
+
+def _raw_attribute_subscripts_in_function(path: Path, function_name: str, attribute_names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Subscript):
+                continue
+            if isinstance(child.value, ast.Attribute) and child.value.attr in attribute_names:
+                violations.append(f"{path}:{child.lineno} {function_name} should use scope methods")
     return violations
 
 

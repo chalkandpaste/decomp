@@ -4,6 +4,7 @@ import unittest
 
 from decomp.function_signatures import (
     FunctionDeclaration,
+    RegisterScope,
     RegisterSignature,
     add_function_sigs,
     get_function_signature,
@@ -74,9 +75,9 @@ class FunctionSignatureTests(unittest.TestCase):
 
         signature = _quiet_signature(graph)
 
-        self.assertTrue(signature.return_scope[b"r0"])
-        self.assertFalse(signature.return_scope[b"r1"])
-        self.assertFalse(signature.argument_scope[b"r0"])
+        self.assertTrue(signature.return_scope.uses(b"r0"))
+        self.assertFalse(signature.return_scope.uses(b"r1"))
+        self.assertFalse(signature.argument_scope.uses(b"r0"))
 
     def test_detects_store_input_registers_as_arguments(self) -> None:
         graph = _single_block_graph(
@@ -88,9 +89,9 @@ class FunctionSignatureTests(unittest.TestCase):
 
         signature = _quiet_signature(graph)
 
-        self.assertFalse(signature.return_scope[b"r0"])
-        self.assertTrue(signature.argument_scope[b"r0"])
-        self.assertTrue(signature.argument_scope[b"r1"])
+        self.assertFalse(signature.return_scope.uses(b"r0"))
+        self.assertTrue(signature.argument_scope.uses(b"r0"))
+        self.assertTrue(signature.argument_scope.uses(b"r1"))
 
     def test_merges_arguments_from_multiple_branch_exits(self) -> None:
         entry = LegacyBlock(
@@ -134,10 +135,10 @@ class FunctionSignatureTests(unittest.TestCase):
 
         signature = _quiet_signature(graph)
 
-        self.assertTrue(signature.argument_scope[b"r0"])
-        self.assertTrue(signature.argument_scope[b"r1"])
-        self.assertTrue(signature.argument_scope[b"r2"])
-        self.assertTrue(signature.argument_scope[b"r3"])
+        self.assertTrue(signature.argument_scope.uses(b"r0"))
+        self.assertTrue(signature.argument_scope.uses(b"r1"))
+        self.assertTrue(signature.argument_scope.uses(b"r2"))
+        self.assertTrue(signature.argument_scope.uses(b"r3"))
 
     def test_render_function_declaration_returns_named_record(self) -> None:
         signature = RegisterSignature(
@@ -162,12 +163,19 @@ class FunctionSignatureTests(unittest.TestCase):
         return_scope[b"r0"] = False
         argument_scope[b"r1"] = False
 
-        self.assertTrue(signature.return_scope[b"r0"])
-        self.assertTrue(signature.argument_scope[b"r1"])
+        self.assertTrue(signature.return_scope.uses(b"r0"))
+        self.assertTrue(signature.argument_scope.uses(b"r1"))
         with self.assertRaises(TypeError):
-            signature.return_scope[b"r0"] = False
+            signature.return_scope._values[b"r0"] = False
         with self.assertRaises(TypeError):
-            signature.argument_scope[b"r1"] = False
+            signature.argument_scope._values[b"r1"] = False
+
+    def test_register_scope_reports_first_used_register(self) -> None:
+        scope = RegisterScope.from_mapping(_scope((b"r0", b"r2")))
+
+        self.assertTrue(scope.uses(b"r2"))
+        self.assertEqual(scope.first_used((b"r3", b"r2", b"r0")), b"r2")
+        self.assertIsNone(scope.first_used((b"s0", b"s1")))
 
 
 def _single_block_graph(instructions: list[list[object]]) -> LegacyBlockGraph:
