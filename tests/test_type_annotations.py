@@ -221,6 +221,12 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_structure_uses_explicit_control_flow_instead_of_bare_except(self) -> None:
+        self.assertEqual(_bare_except_handlers(Path("src/decomp/structure.py")), [])
+
+    def test_structure_uses_fifo_collections_for_fifo_traversal(self) -> None:
+        self.assertEqual(_list_pop_zero_calls(Path("src/decomp/structure.py")), [])
+
     def test_add_function_sigs_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _exact_import_violations(
@@ -1028,6 +1034,31 @@ def _mutable_meta_block_constructor_arguments(path: Path) -> list[str]:
                 violations.append(f"{path}:{node.lineno} pass tuple-backed values to {call_name}.{keyword.arg}")
             elif isinstance(keyword.value, ast.Name) and keyword.value.id in list_variable_names:
                 violations.append(f"{path}:{node.lineno} wrap {keyword.value.id} before {call_name}.{keyword.arg}")
+    return violations
+
+
+def _bare_except_handlers(path: Path) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ExceptHandler) and node.type is None:
+            violations.append(f"{path}:{node.lineno} replace bare except with explicit control flow or exception type")
+    return violations
+
+
+def _list_pop_zero_calls(path: Path) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Attribute) or node.func.attr != "pop":
+            continue
+        if len(node.args) != 1:
+            continue
+        argument = node.args[0]
+        if isinstance(argument, ast.Constant) and argument.value == 0:
+            violations.append(f"{path}:{node.lineno} use deque.popleft() for FIFO traversal")
     return violations
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import replace
 
 from .loop_tracker import LoopTracker
@@ -22,7 +23,7 @@ class MetaBlockFinder(LoopTracker):
         super().__init__(graph)
 
 
-    def all_seen_are_reachable(self, reachable: list[int], end_loc: int | None) -> bool:
+    def all_seen_are_reachable(self, reachable: set[int], end_loc: int | None) -> bool:
         # print("all_seen_are_reachable", [hex(r) for r in reachable], hex(end_loc))
         if len(reachable) == 0:
             return False
@@ -55,8 +56,8 @@ class MetaBlockFinder(LoopTracker):
 
         intersection = None
         
-        paths_index = { start_loc : [] } # { dest1 : [src1, src2, ..] , ...}
-        retrace_nodes = [start_loc]
+        paths_index: dict[int, set[int]] = {start_loc: set()} # { dest1 : {src1, src2, ..} , ...}
+        retrace_nodes: deque[int] = deque([start_loc])
         seen_loops: set[int] = set()
         
         check = False
@@ -64,8 +65,8 @@ class MetaBlockFinder(LoopTracker):
             
             count = 0
 
-            while len(retrace_nodes) > 0:
-                loc = retrace_nodes.pop(0)
+            while retrace_nodes:
+                loc = retrace_nodes.popleft()
                 c_locs = self.graph.successors(loc)
 
 
@@ -73,9 +74,8 @@ class MetaBlockFinder(LoopTracker):
                     seen_loops.add(loc)
 
                 for c in c_locs:
-                    if c not in seen_loops: 
-                        paths_index[c] = list(set( paths_index[loc] + [loc] +\
-                            (paths_index[c] if c in paths_index else []) ));
+                    if c not in seen_loops:
+                        paths_index[c] = paths_index[loc] | {loc} | paths_index.get(c, set())
                     
                         # if self.is_loop_start(c):
                             # seen_loops[c] = True
@@ -87,36 +87,40 @@ class MetaBlockFinder(LoopTracker):
                 if count > 1024:
                     break
             
-            retrace_nodes2 = [start_loc]
+            retrace_nodes2: deque[int] = deque([start_loc])
             seen_loops2: set[int] = set()
-            try:
-                while len(retrace_nodes2) > 0:
-                    loc = retrace_nodes2.pop(0)
-                    c_locs = self.graph.successors(loc)
-                    
-                    # print("checking", hex(loc))
-                    # print([hex(v) for v in paths_index[loc]])
-                    
-                    if not self.is_loop_start(loc) and\
-                            not self.is_loop_end(loc) and\
-                            self.all_seen_are_reachable(paths_index[loc], loc) and\
-                            not (self.get_loop_start(loc) in seen_loops2 and self.can_loop(loc)):
+            missing_path = False
+            while retrace_nodes2:
+                loc = retrace_nodes2.popleft()
+                path_to_loc = paths_index.get(loc)
+                if path_to_loc is None:
+                    missing_path = True
+                    break
+                c_locs = self.graph.successors(loc)
+
+                # print("checking", hex(loc))
+                # print([hex(v) for v in paths_index[loc]])
+
+                if not self.is_loop_start(loc) and not self.is_loop_end(loc):
+                    reaches_common_node = self.all_seen_are_reachable(path_to_loc, loc)
+                    already_checked_loop = self.get_loop_start(loc) in seen_loops2 and self.can_loop(loc)
+                    if reaches_common_node and not already_checked_loop:
                         if not (len(c_locs) == 1 and len(self.graph.predecessors(c_locs[0])) == 1):
                             intersection = loc
                             break
-                
-                    if loc in seen_loops and loc not in seen_loops2:
-                        # promote to a seen loop for this cycle
-                        seen_loops2.add(loc)
-
-                    if loc != end_loc: # end_loc is not None and 
-                        for c in c_locs:
-                            if c not in retrace_nodes2 and\
-                                not (c in seen_loops2 and self.is_loop_start(c)):
-                                    retrace_nodes2.append(c) # push
             
-            except:
-                # print('exception1')
+                if loc in seen_loops and loc not in seen_loops2:
+                    # promote to a seen loop for this cycle
+                    seen_loops2.add(loc)
+
+                if loc != end_loc: # end_loc is not None and
+                    for c in c_locs:
+                        already_pending = c in retrace_nodes2
+                        already_checked_loop_child = c in seen_loops2 and self.is_loop_start(c)
+                        if not already_pending and not already_checked_loop_child:
+                            retrace_nodes2.append(c) # push
+
+            if missing_path:
                 continue
             if len(retrace_nodes) == 0 and not check:
                 # print('pass1')
