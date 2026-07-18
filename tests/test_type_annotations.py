@@ -79,8 +79,13 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
-    def test_block_graph_uses_explicit_instruction_imports(self) -> None:
-        self.assertEqual(_wildcard_imports(Path("src/decomp/block_graph.py")), [])
+    def test_project_uses_explicit_imports(self) -> None:
+        violations = []
+        for root in (Path("src/decomp"), Path("tests")):
+            for path in sorted(root.rglob("*.py")):
+                violations.extend(_wildcard_imports(path))
+
+        self.assertEqual(violations, [])
 
     def test_block_graph_does_not_keep_legacy_child_builders(self) -> None:
         self.assertEqual(

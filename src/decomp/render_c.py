@@ -3,7 +3,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .function_signatures import get_function_signature
-from .instructions import *
+from .instructions import (
+    beq,
+    bge,
+    bgt,
+    ble,
+    blt,
+    bne,
+    compare,
+    cond_block_end,
+    cond_block_end_zero,
+    crs,
+    fp_compare,
+    modifies_NCVZ,
+    ncompare,
+    tst,
+)
 from .legacy_types import LegacyBlock, LegacyBlockGraph
 from .meta_blocks import EndBlock, IfBlock, LinearBlock, MetaBlock, MetaBlockGraph, SwitchBlock, WhileBlock
 
