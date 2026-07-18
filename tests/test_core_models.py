@@ -1,5 +1,6 @@
 import unittest
 
+from decomp.core.cfg import BasicBlock, ControlFlowGraph
 from decomp.core import EdgeKind, FlowKind
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 from decomp.legacy_adapter import legacy_block_graph_to_cfg
@@ -113,6 +114,28 @@ class CoreModelAdapterTests(unittest.TestCase):
             cfg.reachable_order(left.address, stop_address=exit_block.address),
             (left.address,),
         )
+
+    def test_control_flow_graph_replaces_blocks_without_mutating_source_graph(self) -> None:
+        original = BasicBlock(
+            address=0x08020000,
+            end=0x08020002,
+            instructions=(),
+        )
+        replacement = BasicBlock(
+            address=0x08020000,
+            end=0x08020004,
+            instructions=(),
+        )
+        cfg = ControlFlowGraph(
+            entry=original.address,
+            blocks={original.address: original},
+        )
+
+        updated = cfg.with_block(replacement)
+
+        self.assertIs(cfg.block_at(original.address), original)
+        self.assertIs(updated.block_at(replacement.address), replacement)
+        self.assertIsNot(updated, cfg)
 
     def test_preserves_legacy_table_branch_targets(self) -> None:
         block = LegacyBlock(

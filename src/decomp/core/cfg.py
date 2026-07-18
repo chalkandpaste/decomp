@@ -59,6 +59,14 @@ class ControlFlowGraph:
     def block_starts(self) -> tuple[Address, ...]:
         return tuple(sorted(self.blocks))
 
+    def block_items(self) -> tuple[tuple[Address, BasicBlock], ...]:
+        return tuple(self.blocks.items())
+
+    def with_block(self, block: BasicBlock) -> "ControlFlowGraph":
+        blocks = dict(self.blocks)
+        blocks[block.address] = block
+        return ControlFlowGraph(entry=self.entry, blocks=blocks)
+
     def successors(self, address: Address) -> tuple[Address, ...]:
         return tuple(edge.target for edge in self.block_at(address).outgoing)
 
@@ -96,7 +104,7 @@ class ControlFlowGraph:
     def edges(self) -> tuple[Edge, ...]:
         return tuple(
             edge
-            for block in self.blocks.values()
+            for _address, block in self.block_items()
             for edge in block.outgoing
         )
 
@@ -105,7 +113,7 @@ class ControlFlowGraph:
             "entry": hex(self.entry),
             "block_count": len(self.blocks),
             "blocks": [
-                self.blocks[address].to_json()
-                for address in sorted(self.blocks)
+                self.block_at(address).to_json()
+                for address in self.block_starts()
             ],
         }

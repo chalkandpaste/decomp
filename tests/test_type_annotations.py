@@ -156,6 +156,22 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_cfg_post_processing_uses_control_flow_graph_methods(self) -> None:
+        path = Path("src/decomp/analysis/cfg_builder.py")
+        functions = {
+            "_attach_incoming_edges",
+            "_legacy_parent_index",
+            "_reachable_block_order",
+            "_trim_overlapping_blocks",
+        }
+
+        violations = []
+        for function_name in functions:
+            violations.extend(_raw_named_subscripts_in_function(path, function_name, {"blocks"}))
+            violations.extend(_attribute_access_in_function(path, function_name, "cfg", {"blocks"}))
+
+        self.assertEqual(violations, [])
+
     def test_meta_block_graph_construction_uses_source_blocks_name(self) -> None:
         violations = []
         for root in (Path("src/decomp"), Path("tests")):
@@ -611,6 +627,27 @@ def _attribute_access_violations(path: Path, root_name: str, attribute_names: se
     return violations
 
 
+def _attribute_access_in_function(
+    path: Path,
+    function_name: str,
+    root_name: str,
+    attribute_names: set[str],
+) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Attribute) or child.attr not in attribute_names:
+                continue
+            if _attribute_root_name(child.value) == root_name:
+                violations.append(
+                    f"{path}:{child.lineno} {function_name} should use {root_name} methods instead of {root_name}.{child.attr}"
+                )
+    return violations
+
+
 def _legacy_meta_block_graph_constructor_keywords(path: Path) -> list[str]:
     violations = []
     tree = ast.parse(path.read_text(), filename=str(path))
@@ -698,6 +735,21 @@ def _raw_numeric_subscripts_in_function(path: Path, function_name: str, indexes:
                 continue
             if child.slice.value in indexes:
                 violations.append(f"{path}:{child.lineno} {function_name} should use legacy_instruction accessors")
+    return violations
+
+
+def _raw_named_subscripts_in_function(path: Path, function_name: str, root_names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Subscript):
+                continue
+            root_name = _subscript_root_name(child.value)
+            if root_name in root_names:
+                violations.append(f"{path}:{child.lineno} {function_name} should use graph methods instead of {root_name}[...]")
     return violations
 
 

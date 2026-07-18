@@ -82,22 +82,22 @@ def build_control_flow_graph(source: InstructionSource, entry_point: int) -> Con
             if child not in search_locs and child not in blocks:
                 search_locs.append(child)
 
-    blocks = _trim_overlapping_blocks(blocks)
-    blocks = _attach_incoming_edges(entry_point, blocks)
-    return ControlFlowGraph(entry=entry_point, blocks=blocks)
+    cfg = ControlFlowGraph(entry=entry_point, blocks=blocks)
+    cfg = _trim_overlapping_blocks(cfg)
+    return _attach_incoming_edges(cfg)
 
 
 def cfg_to_legacy_block_graph(cfg: ControlFlowGraph) -> LegacyBlockGraph:
-    parents = _legacy_parent_index(cfg.entry, cfg.blocks)
+    parents = _legacy_parent_index(cfg)
     index: LegacyBlockIndex = {}
 
-    for address, block in cfg.blocks.items():
+    for address, block in cfg.block_items():
         index[address] = LegacyBlock(
             address=block.address,
             end_address=block.end,
             instructions=tuple(_legacy_tokens(instruction) for instruction in block.instructions),
             successors=tuple(edge.target for edge in block.outgoing),
-            predecessors=tuple(parents.get(address, [])),
+            predecessors=parents.get(address, ()),
             depth=block.depth,
         )
 
@@ -197,13 +197,13 @@ def _with_outgoing_edges(block: BasicBlock, children: list[int]) -> BasicBlock:
     )
 
 
-def _trim_overlapping_blocks(blocks: dict[int, BasicBlock]) -> dict[int, BasicBlock]:
-    updated = dict(blocks)
-    block_locs = sorted(updated.keys(), reverse=True)
+def _trim_overlapping_blocks(cfg: ControlFlowGraph) -> ControlFlowGraph:
+    updated = cfg
+    block_locs = sorted(cfg.block_starts(), reverse=True)
 
     for index in range(0, len(block_locs) - 1):
-        curr_block = updated[block_locs[index]]
-        prev_block = updated[block_locs[index + 1]]
+        curr_block = updated.block_at(block_locs[index])
+        prev_block = updated.block_at(block_locs[index + 1])
 
         if curr_block.address < prev_block.end:
             trimmed_instructions = tuple(
@@ -216,47 +216,50 @@ def _trim_overlapping_blocks(blocks: dict[int, BasicBlock]) -> dict[int, BasicBl
                 end=curr_block.address,
                 instructions=trimmed_instructions,
             )
-            updated[prev_block.address] = _with_outgoing_edges(trimmed_block, [curr_block.address])
+            updated = updated.with_block(_with_outgoing_edges(trimmed_block, [curr_block.address]))
 
     return updated
 
 
-def _attach_incoming_edges(entry_point: int, blocks: dict[int, BasicBlock]) -> dict[int, BasicBlock]:
-    incoming = {address: [] for address in blocks}
+def _attach_incoming_edges(cfg: ControlFlowGraph) -> ControlFlowGraph:
+    incoming: dict[int, list[Edge]] = {address: [] for address in cfg.block_starts()}
 
-    for source in _reachable_block_order(entry_point, blocks):
-        for edge in blocks[source].outgoing:
+    for source in _reachable_block_order(cfg):
+        for edge in cfg.block_at(source).outgoing:
             if edge.target in incoming and edge.source not in [existing.source for existing in incoming[edge.target]]:
                 incoming[edge.target].append(edge)
 
+    updated = cfg
+    for address, block in cfg.block_items():
+        updated = updated.with_block(replace(block, incoming=tuple(incoming[address])))
+    return updated
+
+
+def _legacy_parent_index(cfg: ControlFlowGraph) -> dict[int, tuple[int, ...]]:
+    parents: dict[int, list[int]] = {address: [] for address in cfg.block_starts()}
+    for source in _reachable_block_order(cfg):
+        for edge in cfg.block_at(source).outgoing:
+            if edge.target in parents and edge.source not in parents[edge.target]:
+                parents[edge.target].append(edge.source)
     return {
-        address: replace(block, incoming=tuple(incoming[address]))
-        for address, block in blocks.items()
+        address: tuple(parent_addresses)
+        for address, parent_addresses in parents.items()
     }
 
 
-def _legacy_parent_index(entry_point: int, blocks: dict[int, BasicBlock]) -> dict[int, list[int]]:
-    parents = {address: [] for address in blocks}
-    for source in _reachable_block_order(entry_point, blocks):
-        for edge in blocks[source].outgoing:
-            if edge.target in parents and edge.source not in parents[edge.target]:
-                parents[edge.target].append(edge.source)
-    return parents
-
-
-def _reachable_block_order(entry_point: int, blocks: dict[int, BasicBlock]) -> list[int]:
-    retrace_nodes = [entry_point]
-    tally = {address: True for address in blocks}
+def _reachable_block_order(cfg: ControlFlowGraph) -> list[int]:
+    retrace_nodes = [cfg.entry]
+    tally = {address: True for address in cfg.block_starts()}
     order = []
 
     while retrace_nodes:
         address = retrace_nodes.pop(-1)
-        if address not in blocks or not tally[address]:
+        if not cfg.has_block(address) or not tally[address]:
             continue
         tally[address] = False
         order.append(address)
 
-        for edge in blocks[address].outgoing:
+        for edge in cfg.block_at(address).outgoing:
             if edge.target in tally and tally[edge.target]:
                 retrace_nodes.append(edge.target)
 
