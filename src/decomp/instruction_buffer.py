@@ -1,5 +1,5 @@
+from .arch import ArchitectureBackend, default_architecture_backend
 from .arch.arm_thumb.backend import (
-    ArmThumbBackend,
     fix_jump_offset,
     is_probable_address_literal,
     normalize_rasm2_output,
@@ -9,8 +9,9 @@ from .core.instruction import Instruction
 from .legacy_types import LegacyInstruction
 
 
-def disassemble_section(section_bytes: bytes) -> bytes:
-    return ArmThumbBackend().disassemble_section(section_bytes)
+def disassemble_section(section_bytes: bytes, backend: ArchitectureBackend | None = None) -> bytes:
+    decoder = backend or default_architecture_backend()
+    return decoder.disassemble_section(section_bytes)
 
 
 class InstructionsBuffer:
@@ -20,11 +21,12 @@ class InstructionsBuffer:
         entry_point_loc: int = 0x08020004,
         binary_offset_loc: int = 0x08020000,
         n_bytes: int = 4096,
+        backend: ArchitectureBackend | None = None,
     ) -> None:
         self.binary = binary
         self.binary_offset_loc = binary_offset_loc
         self.buff_len_bytes = n_bytes
-        self.backend = ArmThumbBackend()
+        self.backend = backend or default_architecture_backend()
         self.update_loc(entry_point_loc)
 
     def read_instructions_binary(self, loc: int) -> list[LegacyInstruction]:
@@ -80,7 +82,7 @@ class InstructionsBuffer:
 
         return self.typed_insns_buff[idx:]
 
-    def _backend(self) -> ArmThumbBackend:
+    def _backend(self) -> ArchitectureBackend:
         if not hasattr(self, "backend"):
-            self.backend = ArmThumbBackend()
+            self.backend = default_architecture_backend()
         return self.backend

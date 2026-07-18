@@ -28,6 +28,9 @@ class ArchitectureBackend(Protocol):
     display_name: str
     disassembler: DisassemblerConfig
 
+    def disassemble_section(self, section_bytes: bytes) -> bytes:
+        """Disassemble raw section bytes into the legacy rasm2-compatible text format."""
+
     def decode_window(
         self,
         binary: bytes,
@@ -37,6 +40,16 @@ class ArchitectureBackend(Protocol):
         size: int = 4096,
     ) -> tuple[Instruction, ...]:
         """Decode a window of firmware bytes into typed instructions."""
+
+    def decode_window_as_legacy_tokens(
+        self,
+        binary: bytes,
+        address: int,
+        *,
+        base_address: int = 0x08020000,
+        size: int = 4096,
+    ) -> list[list[object]]:
+        """Decode a window of firmware bytes into current legacy token lists."""
 
     def decode_legacy_tokens(self, tokens: list[object]) -> Instruction:
         """Convert current legacy token lists into typed instructions."""

@@ -5,7 +5,22 @@ from decomp import convert_c
 from decomp import instructions
 from decomp.arch.arm_thumb import ArmThumbBackend
 from decomp.core import FlowKind
-from decomp.instruction_buffer import InstructionsBuffer, is_probable_address_literal
+from decomp.instruction_buffer import InstructionsBuffer, disassemble_section, is_probable_address_literal
+
+
+class FixtureBackend(ArmThumbBackend):
+    def disassemble_section(self, _section_bytes: bytes) -> bytes:
+        return b"fixture disassembly"
+
+    def decode_window_as_legacy_tokens(
+        self,
+        _binary: bytes,
+        _address: int,
+        *,
+        base_address: int = 0x08020000,
+        size: int = 4096,
+    ) -> list[list[object]]:
+        return [[b"0x8020000", b"2", b"0000", b"bx", b"lr"]]
 
 
 class InstructionBufferLiteralTests(unittest.TestCase):
@@ -45,6 +60,14 @@ class InstructionBufferLiteralTests(unittest.TestCase):
         self.assertEqual(typed[0].mnemonic, "beq")
         self.assertEqual(typed[0].flow.kind, FlowKind.CONDITIONAL_BRANCH)
         self.assertEqual(typed[0].flow.targets, (0x08020008,))
+
+    def test_disassemble_section_accepts_architecture_backend(self) -> None:
+        self.assertEqual(disassemble_section(b"", backend=FixtureBackend()), b"fixture disassembly")
+
+    def test_constructor_accepts_architecture_backend(self) -> None:
+        buf = InstructionsBuffer(b"", entry_point_loc=0x08020000, backend=FixtureBackend())
+
+        self.assertEqual(buf.read_typed_insns_at_loc(0x08020000)[0].mnemonic, "bx")
 
 
 class ArmThumbBackendDecodeTests(unittest.TestCase):

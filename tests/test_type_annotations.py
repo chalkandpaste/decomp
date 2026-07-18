@@ -360,6 +360,15 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_instruction_buffer_uses_architecture_backend_protocol(self) -> None:
+        self.assertEqual(
+            _imported_name_violations(
+                Path("src/decomp/instruction_buffer.py"),
+                {"ArmThumbBackend"},
+            ),
+            [],
+        )
+
     def test_cfg_block_collection_uses_typed_return_predicates(self) -> None:
         self.assertEqual(
             _exact_import_violations(
@@ -554,6 +563,21 @@ def _exact_import_violations(path: Path, modules: set[str]) -> list[str]:
                     violations.append(f"{path}:{node.lineno} keep {alias.name} behind a typed helper")
         if isinstance(node, ast.ImportFrom) and node.module in modules:
             violations.append(f"{path}:{node.lineno} keep {node.module} behind a typed helper")
+    return violations
+
+
+def _imported_name_violations(path: Path, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.rsplit(".", 1)[-1] in names or alias.asname in names:
+                    violations.append(f"{path}:{node.lineno} depend on architecture backend protocol")
+        if isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if alias.name in names or alias.asname in names:
+                    violations.append(f"{path}:{node.lineno} depend on architecture backend protocol")
     return violations
 
 
