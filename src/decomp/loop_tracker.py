@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Protocol
 
 
@@ -13,46 +14,64 @@ class LoopGraph(Protocol):
         pass
 
 
+@dataclass(frozen=True)
+class LoopInfo:
+    start: int | None
+    end: int | None
+    locations: tuple[int, ...]
+
+
 class LoopTracker:
 
     def __init__(self, graph: LoopGraph) -> None:
         self.graph = graph
-        self.loc_to_loop_end: dict[int, int | None] = {}
-        self.loc_to_loop_start: dict[int, int | None] = {}
-        self.loc_to_loop_locs: dict[int, tuple[int, ...]] = {}
+        self._loc_to_loop: dict[int, LoopInfo] = {}
         self.not_loop_loc: set[int] = set() # locs which are not in a loop
 
     def is_loop_start(self, loc: int) -> bool | None:
         # print('is_loop_start', hex(loc))
-        if loc in self.loc_to_loop_start:
-            return loc == self.loc_to_loop_start[loc]
+        loop = self.loop_info(loc)
+        if loop is not None:
+            return loc == loop.start
         elif loc in self.not_loop_loc:
             return False
         else:
             self.detect_loop(loc)
-            if loc in self.loc_to_loop_start:
-                return loc == self.loc_to_loop_start[loc]
+            loop = self.loop_info(loc)
+            if loop is not None:
+                return loc == loop.start
     
     def get_loop_start(self, loc: int) -> int | None:
-        return self.loc_to_loop_start.get(loc)
+        loop = self.loop_info(loc)
+        return None if loop is None else loop.start
     
     def is_loop_end(self, loc: int) -> bool | None:
         # print('is_loop_end', hex(loc))
-        if loc in self.loc_to_loop_end:
-            return loc == self.loc_to_loop_end[loc]
+        loop = self.loop_info(loc)
+        if loop is not None:
+            return loc == loop.end
         elif loc in self.not_loop_loc:
             return False
         else:
             self.detect_loop(loc)
-            if loc in self.loc_to_loop_end:
-                return loc == self.loc_to_loop_end[loc]
+            loop = self.loop_info(loc)
+            if loop is not None:
+                return loc == loop.end
     
     def get_loop_end(self, loc: int) -> int | None:
-        return self.loc_to_loop_end.get(loc)
+        loop = self.loop_info(loc)
+        return None if loop is None else loop.end
+
+    def loop_info(self, loc: int) -> LoopInfo | None:
+        return self._loc_to_loop.get(loc)
+
+    def loop_locations(self, loc: int) -> tuple[int, ...]:
+        loop = self.loop_info(loc)
+        return () if loop is None else loop.locations
 
     def can_loop(self, loc: int) -> bool:
         # print('can_loop', hex(loc))
-        if loc in self.loc_to_loop_start:
+        if loc in self._loc_to_loop:
             # print('in start')
             return True
         elif loc in self.not_loop_loc:
@@ -112,7 +131,7 @@ class LoopTracker:
         # for each point, if the parent is loopable (can reach itself) add it to the set
         # for each point, if the child is loopable, at it to the set
 
-        if start_loc in self.loc_to_loop_start:
+        if start_loc in self._loc_to_loop:
             return True
         elif start_loc in self.not_loop_loc:
             return False
@@ -246,9 +265,12 @@ class LoopTracker:
             print("loop_locs", [hex(l) for l in loop_locs])
             raise Exception
 
+        loop = LoopInfo(
+            start=entrance_loc,
+            end=exit_loc,
+            locations=tuple(loop_locs),
+        )
         for loc in loop_locs:
-            self.loc_to_loop_start[loc] = entrance_loc
-            self.loc_to_loop_end[loc] = exit_loc
-            self.loc_to_loop_locs[loc] = tuple(loop_locs)
+            self._loc_to_loop[loc] = loop
 
         return tuple(loop_locs), entrance_loc, exit_loc

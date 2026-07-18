@@ -235,12 +235,18 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             _forbidden_attribute_annotations(
                 path,
                 {
-                    "loc_to_loop_locs": {"list"},
                     "not_loop_loc": {"dict"},
                 },
             ),
             [],
         )
+
+    def test_loop_tracker_uses_loop_info_record_for_cached_loop_state(self) -> None:
+        path = Path("src/decomp/loop_tracker.py")
+
+        self.assertEqual(_unfrozen_dataclass_records(path, {"LoopInfo"}), [])
+        self.assertEqual(_forbidden_attribute_names(path, {"loc_to_loop_end", "loc_to_loop_locs", "loc_to_loop_start"}), [])
+        self.assertEqual(_external_attribute_access(Path("tests/test_loop_tracker.py"), {"_loc_to_loop"}), [])
 
     def test_loop_tracker_loop_accessors_do_not_keep_dead_branches(self) -> None:
         self.assertEqual(
@@ -1100,6 +1106,24 @@ def _forbidden_attribute_annotations(path: Path, names_to_forbidden_types: dict[
         for forbidden_type in forbidden_types:
             if _annotation_mentions_name(node.annotation, forbidden_type):
                 violations.append(f"{path}:{node.lineno} {node.target.attr} should not use {forbidden_type}")
+    return violations
+
+
+def _forbidden_attribute_names(path: Path, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr in names:
+            violations.append(f"{path}:{node.lineno} use LoopInfo cache instead of {node.attr}")
+    return violations
+
+
+def _external_attribute_access(path: Path, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr in names:
+            violations.append(f"{path}:{node.lineno} use public model accessors instead of {node.attr}")
     return violations
 
 

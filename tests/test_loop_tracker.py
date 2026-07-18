@@ -4,7 +4,7 @@ import unittest
 
 from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
-from decomp.loop_tracker import LoopTracker
+from decomp.loop_tracker import LoopInfo, LoopTracker
 
 
 def _legacy_block(address: int, successors: tuple[int, ...], predecessors: tuple[int, ...]) -> LegacyBlock:
@@ -34,7 +34,11 @@ class LoopTrackerTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertTrue(tracker.can_loop(first.address))
 
-        self.assertEqual(tracker.loc_to_loop_locs[first.address], (first.address, second.address))
+        self.assertEqual(tracker.loop_locations(first.address), (first.address, second.address))
+        self.assertEqual(
+            tracker.loop_info(first.address),
+            LoopInfo(start=None, end=None, locations=(first.address, second.address)),
+        )
         self.assertIsNone(tracker.get_loop_start(first.address))
         self.assertIsNone(tracker.get_loop_end(first.address))
 
