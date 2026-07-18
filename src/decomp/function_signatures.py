@@ -17,9 +17,7 @@ skip_functions = [ 134469972, 134471256, 134469472, 134471424, 134472782, 134455
             # 0x8020244, 0x803af68, 0x8030144, 0x802ff6c, 0x802fd58, 0x803c23c,  ]
 
 def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, bytes]) -> LegacyBlockGraph:
-    start_block = block_graph.start_block
-
-    search_locs = [start_block.address]
+    search_locs = [block_graph.entry_address]
 
     seen = {} # only need one pass ever
 
@@ -56,13 +54,13 @@ def collect_functions(block_graph: LegacyBlockGraph) -> list[int]:
     return collect_function_addresses(cfg)
 
 def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegisterScope, LegacyRegisterScope]:
-    start_block = block_graph.start_block
-    print('get_function_signature', hex(start_block.address))
+    entry_address = block_graph.entry_address
+    print('get_function_signature', hex(entry_address))
 
     loop_tracker = LoopTracker(block_graph)
     loops = {}
 
-    search_locs = [start_block.address]
+    search_locs = [entry_address]
 
     init_forward_scope = {b'r0' : False, b'r1': False, b's0' : False, b'd0': False}
     
@@ -522,7 +520,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
                 search_locs.append(p)
         
 
-    arg_scope = loc_scope[start_block.address]
+    arg_scope = loc_scope[entry_address]
 
     return return_scope, arg_scope
 

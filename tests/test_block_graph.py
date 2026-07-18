@@ -26,7 +26,7 @@ class BlockGraphTests(unittest.TestCase):
                 override_input=insns,
             )
 
-        self.assertEqual(graph.start_block.address, 0x08020000)
+        self.assertEqual(graph.entry_address, 0x08020000)
         self.assertEqual(
             graph.successors(0x08020000),
             (0x08020008, 0x08020004),

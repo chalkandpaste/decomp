@@ -147,9 +147,9 @@ class MetaBlockFinder(LoopTracker):
 
 
 def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
-    print('annotate_graph', hex(block_graph.start_block.address))
+    print('annotate_graph', hex(block_graph.entry_address))
 
-    start_loc = block_graph.start_block.address
+    start_loc = block_graph.entry_address
 
     mbf = MetaBlockFinder(block_graph)
 
@@ -201,8 +201,6 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
 
         preface.append(start_loc)
         seen_locs[start_loc] = True
-
-        # print("loop block", start_block)
 
         if len(children) == 2:
             have_not_made_meta_block = meta_block_loc not in meta_block_index

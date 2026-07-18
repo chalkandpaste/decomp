@@ -41,7 +41,7 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         self.assertEqual(
             _forbidden_properties(
                 Path("src/decomp/legacy_types.py"),
-                {"block", "children", "end_loc", "index", "loc", "parents"},
+                {"block", "children", "end_loc", "index", "loc", "parents", "start_block"},
             ),
             [],
         )

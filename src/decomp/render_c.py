@@ -280,7 +280,7 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
 
 
 def generate_func_decl(block_graph: LegacyBlockGraph) -> bytes:
-    start = block_graph.start_block.address
+    start = block_graph.entry_address
 
 
     fs = get_function_signature(block_graph)

@@ -27,10 +27,6 @@ class LegacyBlockGraph:
     blocks: LegacyBlockIndex
     entry_address: int
 
-    @property
-    def start_block(self) -> LegacyBlock:
-        return self.block_at(self.entry_address)
-
     def block_at(self, address: int) -> LegacyBlock:
         return self.blocks[address]
 
