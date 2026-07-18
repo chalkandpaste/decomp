@@ -21,6 +21,20 @@ class LoopInfo:
     locations: tuple[int, ...]
 
 
+@dataclass(frozen=True)
+class LoopDetection:
+    locations: tuple[int, ...]
+    entrance: int | None
+    exit: int | None
+
+    def to_loop_info(self) -> LoopInfo:
+        return LoopInfo(
+            start=self.entrance,
+            end=self.exit,
+            locations=self.locations,
+        )
+
+
 class LoopTracker:
 
     def __init__(self, graph: LoopGraph) -> None:
@@ -145,13 +159,13 @@ class LoopTracker:
             self.not_loop_loc.add(start_loc)
             return False
        
-        loop_locs, entrance_loc, exit_loc = self._detect_loop_inner(search_locs)
-        if entrance_loc is not None and exit_loc is not None:
-            dont_follow = (entrance_loc, exit_loc)
-            while len(loop_locs) > 0:
-                loop_locs, entrance_loc, exit_loc = self._detect_loop_inner(loop_locs, dont_follow)
-                if entrance_loc is not None and exit_loc is not None:
-                    dont_follow += (entrance_loc, exit_loc)
+        detection = self._detect_loop_inner(search_locs)
+        if detection.entrance is not None and detection.exit is not None:
+            dont_follow = (detection.entrance, detection.exit)
+            while len(detection.locations) > 0:
+                detection = self._detect_loop_inner(detection.locations, dont_follow)
+                if detection.entrance is not None and detection.exit is not None:
+                    dont_follow += (detection.entrance, detection.exit)
 
         return True
     
@@ -185,7 +199,7 @@ class LoopTracker:
         self,
         search_locs: Iterable[int],
         dont_follow: Iterable[int] | None = None,
-    ) -> tuple[tuple[int, ...], int | None, int | None]:
+    ) -> LoopDetection:
         if dont_follow is None:
             dont_follow = ()
         search_locs = tuple(search_locs)
@@ -267,12 +281,13 @@ class LoopTracker:
             print("loop_locs", [hex(l) for l in loop_locs])
             raise Exception
 
-        loop = LoopInfo(
-            start=entrance_loc,
-            end=exit_loc,
+        detection = LoopDetection(
             locations=tuple(loop_locs),
+            entrance=entrance_loc,
+            exit=exit_loc,
         )
+        loop = detection.to_loop_info()
         for loc in loop_locs:
             self._loc_to_loop[loc] = loop
 
-        return tuple(loop_locs), entrance_loc, exit_loc
+        return detection

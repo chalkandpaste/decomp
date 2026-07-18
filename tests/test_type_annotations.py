@@ -248,6 +248,20 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         self.assertEqual(_forbidden_attribute_names(path, {"loc_to_loop_end", "loc_to_loop_locs", "loc_to_loop_start"}), [])
         self.assertEqual(_external_attribute_access(Path("tests/test_loop_tracker.py"), {"_loc_to_loop"}), [])
 
+    def test_loop_tracker_uses_loop_detection_record_for_internal_results(self) -> None:
+        path = Path("src/decomp/loop_tracker.py")
+
+        self.assertEqual(_unfrozen_dataclass_records(path, {"LoopDetection"}), [])
+        self.assertEqual(
+            _function_return_annotation_violations(
+                path,
+                {"_detect_loop_inner"},
+                "LoopDetection",
+            ),
+            [],
+        )
+        self.assertEqual(_tuple_return_violations(path, {"_detect_loop_inner"}), [])
+
     def test_loop_tracker_loop_accessors_do_not_keep_dead_branches(self) -> None:
         self.assertEqual(
             _statements_after_return_in_functions(
@@ -1188,6 +1202,18 @@ def _function_return_annotation_violations(
         actual = ast.unparse(node.returns) if node.returns is not None else None
         if actual != expected_annotation:
             violations.append(f"{path}:{node.lineno} {node.name} should return {expected_annotation}")
+    return violations
+
+
+def _tuple_return_violations(path: Path, function_names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name not in function_names:
+            continue
+        for child in ast.walk(node):
+            if isinstance(child, ast.Return) and isinstance(child.value, ast.Tuple):
+                violations.append(f"{path}:{child.lineno} {node.name} should return a named record")
     return violations
 
 

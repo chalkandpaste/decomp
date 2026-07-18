@@ -4,7 +4,7 @@ import unittest
 
 from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
-from decomp.loop_tracker import LoopInfo, LoopTracker
+from decomp.loop_tracker import LoopDetection, LoopInfo, LoopTracker
 
 
 def _legacy_block(address: int, successors: tuple[int, ...], predecessors: tuple[int, ...]) -> LegacyBlock:
@@ -18,6 +18,22 @@ def _legacy_block(address: int, successors: tuple[int, ...], predecessors: tuple
 
 
 class LoopTrackerTests(unittest.TestCase):
+    def test_loop_detection_converts_to_cached_loop_info(self) -> None:
+        detection = LoopDetection(
+            locations=(0x08020002, 0x08020004),
+            entrance=0x08020002,
+            exit=0x08020004,
+        )
+
+        self.assertEqual(
+            detection.to_loop_info(),
+            LoopInfo(
+                start=0x08020002,
+                end=0x08020004,
+                locations=(0x08020002, 0x08020004),
+            ),
+        )
+
     def test_loop_tracker_uses_block_graph_model(self) -> None:
         first = _legacy_block(0x08020000, (0x08020002,), (0x08020002,))
         second = _legacy_block(0x08020002, (0x08020000,), (0x08020000,))
