@@ -50,8 +50,17 @@ class ControlFlowGraph:
     entry: Address
     blocks: dict[Address, BasicBlock] = field(default_factory=dict)
 
+    def block_at(self, address: Address) -> BasicBlock:
+        return self.blocks[address]
+
     def block_starts(self) -> tuple[Address, ...]:
         return tuple(sorted(self.blocks))
+
+    def successors(self, address: Address) -> tuple[Address, ...]:
+        return tuple(edge.target for edge in self.block_at(address).outgoing)
+
+    def predecessors(self, address: Address) -> tuple[Address, ...]:
+        return tuple(edge.source for edge in self.block_at(address).incoming)
 
     def edges(self) -> tuple[Edge, ...]:
         return tuple(

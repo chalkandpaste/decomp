@@ -1,10 +1,11 @@
 from .block_graph import generate_block_graph
 from .analysis import collect_function_addresses
-from .arch.arm_thumb import ArmThumbBackend
 from .arch.arm_thumb.register_effects import RegisterEffect, register_effect
+from .core.cfg import ControlFlowGraph
+from .core.instruction import Instruction
 from .legacy_adapter import legacy_block_graph_to_cfg
 from .legacy_instruction import mnemonic, operand_int, with_appended_token
-from .legacy_types import LegacyBlockGraph, LegacyInstruction, LegacyRegisterScope
+from .legacy_types import LegacyBlockGraph, LegacyRegisterScope
 
 from .loop_tracker import LoopTracker
 from .instructions import func_call, uncond_block_end
@@ -61,8 +62,16 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
     entry_address = block_graph.entry_address
     print('get_function_signature', hex(entry_address))
 
-    backend = ArmThumbBackend()
+    cfg = legacy_block_graph_to_cfg(block_graph)
     loop_tracker = LoopTracker(block_graph)
+    return _get_function_signature_from_cfg(cfg, loop_tracker)
+
+
+def _get_function_signature_from_cfg(
+    cfg: ControlFlowGraph,
+    loop_tracker: LoopTracker,
+) -> tuple[LegacyRegisterScope, LegacyRegisterScope]:
+    entry_address = cfg.entry
     loops = {}
 
     search_locs = [entry_address]
@@ -76,7 +85,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
 
     while len(search_locs) > 0:
         loc = search_locs.pop(0)
-        block = block_graph.block_at(loc)
+        block = cfg.block_at(loc)
 
         if loc not in loops:
             if loop_tracker.can_loop(loc):
@@ -88,13 +97,13 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
 
         insns = block.instructions
         for i in insns:
-            effect = _register_effect_for_legacy_instruction(backend, i)
+            effect = _register_effect_for_instruction(i)
             if effect is not None:
                 _apply_forward_register_effect(scope, effect)
 
         loc_scope[loc] = scope
 
-        c_locs = block_graph.successors(loc)
+        c_locs = cfg.successors(loc)
         
         if len(c_locs) == 0:
             if loc not in ends:
@@ -141,7 +150,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
     
     while len(search_locs) > 0:
         loc = search_locs.pop(0)
-        block = block_graph.block_at(loc)
+        block = cfg.block_at(loc)
 
         if loc not in loops:
             if loop_tracker.can_loop(loc):
@@ -155,13 +164,13 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
         insns.reverse()
 
         for i in insns:
-            effect = _register_effect_for_legacy_instruction(backend, i)
+            effect = _register_effect_for_instruction(i)
             if effect is not None:
                 _apply_backward_register_effect(scope, effect)
 
         loc_scope[loc] = scope
 
-        p_locs = block_graph.predecessors(loc)
+        p_locs = cfg.predecessors(loc)
         
         for p in p_locs:
             if p not in loc_scope:
@@ -182,11 +191,8 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
     return return_scope, arg_scope
 
 
-def _register_effect_for_legacy_instruction(
-    backend: ArmThumbBackend,
-    instruction: LegacyInstruction,
-) -> RegisterEffect | None:
-    return register_effect(backend.decode_legacy_tokens(instruction))
+def _register_effect_for_instruction(instruction: Instruction) -> RegisterEffect | None:
+    return register_effect(instruction)
 
 
 def _apply_forward_register_effect(scope: LegacyRegisterScope, effect: RegisterEffect) -> None:

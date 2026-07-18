@@ -132,6 +132,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_typed_function_signature_traversal_stays_off_legacy_decode(self) -> None:
+        self.assertEqual(
+            _function_call_violations(
+                Path("src/decomp/function_signatures.py"),
+                "_get_function_signature_from_cfg",
+                {"decode_legacy_tokens", "legacy_block_graph_to_cfg"},
+            ),
+            [],
+        )
+
     def test_get_children_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _raw_numeric_subscripts_in_function(
