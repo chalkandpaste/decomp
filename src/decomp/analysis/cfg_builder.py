@@ -4,6 +4,11 @@ from dataclasses import replace
 from typing import Protocol
 
 from decomp.arch.arm_thumb import ArmThumbBackend
+from decomp.arch.arm_thumb.control_flow import (
+    is_link_register_restore,
+    is_pc_return,
+    is_return_to_link_register,
+)
 from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
 from decomp.core.flow import EdgeKind, FlowKind
 from decomp.core.instruction import Instruction
@@ -129,7 +134,6 @@ def _collect_block_instructions(instructions: tuple[Instruction, ...]) -> tuple[
     found_block_end = False
 
     for index, instruction in enumerate(instructions):
-        tokens = _legacy_tokens(instruction)
         mnemonic = _mnemonic(instruction)
         block.append(instruction)
 
@@ -139,21 +143,21 @@ def _collect_block_instructions(instructions: tuple[Instruction, ...]) -> tuple[
 
         if mnemonic in func_end + exchange_return:
             end_of_function = True
-            if _contains_pc_return(tokens):
+            returns_via_pc = is_pc_return(instruction)
+            restores_link_register = is_link_register_restore(instruction)
+            if returns_via_pc or is_return_to_link_register(instruction):
                 break
-            if mnemonic == b"bx" and len(tokens) >= 5 and tokens[4] == b"lr":
-                break
-            if _contains_lr_restore(tokens):
+            if restores_link_register:
                 for tail_instruction in instructions[index + 1:]:
                     block.append(tail_instruction)
                     if _mnemonic(tail_instruction) in uncond_block_end:
                         break
                 break
-            if (mnemonic == b"pop" and not _contains_pc_return(tokens)) or not _contains_lr_restore(tokens):
+            if (mnemonic == b"pop" and not returns_via_pc) or not restores_link_register:
                 end_of_function = False
                 continue
 
-            raise ValueError(f"unsupported function ending: {tokens!r}")
+            raise ValueError(f"unsupported function ending: {instruction.to_json()!r}")
 
     return block, end_of_function, found_block_end or end_of_function
 
@@ -277,11 +281,3 @@ def _legacy_tokens(instruction: Instruction) -> LegacyInstruction:
 
 def _mnemonic(instruction: Instruction) -> bytes:
     return instruction.mnemonic.encode("ascii")
-
-
-def _contains_pc_return(tokens: LegacyInstruction) -> bool:
-    return b"pc," in tokens[5:] or b"pc}" in tokens[4:] or b"{pc}" in tokens[4:]
-
-
-def _contains_lr_restore(tokens: LegacyInstruction) -> bool:
-    return b"lr," in tokens[5:] or b"lr}" in tokens[4:]

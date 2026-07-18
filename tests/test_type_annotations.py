@@ -142,6 +142,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_cfg_block_collection_uses_typed_return_predicates(self) -> None:
+        self.assertEqual(
+            _function_call_violations(
+                Path("src/decomp/analysis/cfg_builder.py"),
+                "_collect_block_instructions",
+                {"_contains_lr_restore", "_contains_pc_return", "_legacy_tokens"},
+            ),
+            [],
+        )
+
     def test_xrefs_use_typed_flow_and_operands(self) -> None:
         self.assertEqual(
             _function_call_violations(
