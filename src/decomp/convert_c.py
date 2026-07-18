@@ -1,5 +1,3 @@
-import pickle
-import re
 import argparse
 from typing import TypeAlias
 
@@ -7,6 +5,10 @@ from . import instructions as ns
 from .legacy_types import LegacyConvertedSection, LegacyLineSection
 
 InstructionTokens: TypeAlias = list[bytes]
+
+
+def instruction_mnemonic(instruction: InstructionTokens) -> bytes:
+    return instruction[0]
 
 
 def map_sections(sections: list[LegacyLineSection]) -> list[LegacyConvertedSection]:
@@ -44,56 +46,57 @@ def map_sections(sections: list[LegacyLineSection]) -> list[LegacyConvertedSecti
     return new_sections
 
 def convert_instruction(insn: InstructionTokens) -> bytes:
-    if insn[0] in ns.moves:
+    mnemonic = instruction_mnemonic(insn)
+    if mnemonic in ns.moves:
         return mov(insn)
-    if insn[0] in ns.n_moves:
+    if mnemonic in ns.n_moves:
         return n_mov(insn)
-    if insn[0] in ns.load:
+    if mnemonic in ns.load:
         return load(insn)
-    if insn[0] in ns.load_d:
+    if mnemonic in ns.load_d:
         return load_d(insn)
-    if insn[0] in ns.store:
+    if mnemonic in ns.store:
         return store(insn)
-    if insn[0] in ns.store_d:
+    if mnemonic in ns.store_d:
         return store_d(insn)
-    elif insn[0] in ns.add:
+    elif mnemonic in ns.add:
         return add(insn)
-    elif insn[0] in ns.sub:
+    elif mnemonic in ns.sub:
         return sub(insn)
-    elif insn[0] in ns.rsb:
+    elif mnemonic in ns.rsb:
         return rev_sub(insn)
-    elif insn[0] in ns.mul:
+    elif mnemonic in ns.mul:
         return mul(insn)
-    elif insn[0] in ns.smull:
+    elif mnemonic in ns.smull:
         return smull(insn)
-    elif insn[0] in ns.vmlas:
+    elif mnemonic in ns.vmlas:
         return vmlas(insn)
-    elif insn[0] in ns.div:
+    elif mnemonic in ns.div:
         return div(insn)
-    elif insn[0] in ns.aand:
+    elif mnemonic in ns.aand:
         return aand(insn)
-    elif insn[0] in ns.bic:
+    elif mnemonic in ns.bic:
         return bic(insn)
-    elif insn[0] in ns.orr:
+    elif mnemonic in ns.orr:
         return orr(insn)
-    elif insn[0] in ns.shift_left:
+    elif mnemonic in ns.shift_left:
         return shift_left(insn)
-    elif insn[0] in ns.shift_right:
+    elif mnemonic in ns.shift_right:
         return shift_right(insn)
-    elif insn[0] in ns.cast:
+    elif mnemonic in ns.cast:
         return cast(insn)
-    elif insn[0] in ns.sxtab:
+    elif mnemonic in ns.sxtab:
         return sxtab(insn)
-    elif insn[0] in ns.bits:
+    elif mnemonic in ns.bits:
         return bits(insn)
-    elif insn[0] in ns.func_call:
+    elif mnemonic in ns.func_call:
         return func_call(insn)
-    elif insn[0] in ns.uncond_block_end:
+    elif mnemonic in ns.uncond_block_end:
         if len(insn) > 2:
             return func_call(insn)
         else:
             return b''
-    elif insn[0] in ns.exchange_return + ns.exchange_func_call + ns.vpop + ns.cond_block_end + ns.cond_block_end_zero + ns.block_end_start + ns.func_end + ns.nop + ns.tbb + ns.func_start: ## ignore
+    elif mnemonic in ns.exchange_return + ns.exchange_func_call + ns.vpop + ns.cond_block_end + ns.cond_block_end_zero + ns.block_end_start + ns.func_end + ns.nop + ns.tbb + ns.func_start: ## ignore
         return empty()
     else:
         print(insn)

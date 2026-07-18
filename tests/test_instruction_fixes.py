@@ -122,6 +122,9 @@ class ArmThumbBackendDecodeTests(unittest.TestCase):
 
 
 class ConvertInstructionTests(unittest.TestCase):
+    def test_convert_instruction_dispatches_via_named_mnemonic_accessor(self) -> None:
+        self.assertEqual(convert_c.convert_instruction([b"mov", b"r0", b"1"]), b"r0 = 1")
+
     def test_three_operand_left_shift_lowers_as_left_shift(self) -> None:
         self.assertEqual(
             convert_c.shift_left([b"lsls", b"r0", b"2"]),

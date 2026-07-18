@@ -503,6 +503,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_convert_c_dispatch_uses_named_instruction_accessors(self) -> None:
+        self.assertEqual(
+            _raw_numeric_subscripts_in_function(
+                Path("src/decomp/convert_c.py"),
+                "convert_instruction",
+                {0},
+            ),
+            [],
+        )
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
