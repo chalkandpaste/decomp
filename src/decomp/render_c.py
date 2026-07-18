@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .function_signatures import get_function_signature, render_function_declaration
@@ -48,9 +49,9 @@ def print_block(block: LegacyBlock) -> bytes:
 
 
 def render_condition(
-    cond: list[int],
-    conj: list[bytes],
-    flags: list[bool],
+    cond: Sequence[int],
+    conj: Sequence[bytes],
+    flags: Sequence[bool],
     meta_block_graph: MetaBlockGraph,
 ) -> RenderedCondition:
 
@@ -60,7 +61,7 @@ def render_condition(
 
     # print('cond', [hex(c) for c in cond])
 
-    conds = cond.copy()
+    conds = list(cond)
     conds.reverse()
 
     need_moar = False

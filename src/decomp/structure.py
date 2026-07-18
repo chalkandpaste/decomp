@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .loop_tracker import LoopTracker
 from .legacy_types import LegacyBlockGraph
 from .meta_blocks import (
@@ -293,7 +295,10 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                             hex(false_loc) if false_loc is not None else None,
                             hex(next_start_loc) if next_start_loc is not None else None)
                     if meta_block_loc in meta_block_index and isinstance(meta_block_index[meta_block_loc], WhileBlock):
-                        meta_block_index[meta_block_loc].inner = IfBlock(
+                        while_block = meta_block_index[meta_block_loc]
+                        meta_block_index[meta_block_loc] = replace(
+                            while_block,
+                            inner=IfBlock(
                                 address=meta_block_loc,
                                 condition_blocks=preface,
                                 flags=[True],
@@ -301,7 +306,8 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
                                 true_address=true_loc,
                                 false_address=false_loc,
                                 next_address=next_start_loc,
-                                )
+                            ),
+                        )
                     else:
                         meta_block_index[meta_block_loc] = IfBlock(
                                 address=meta_block_loc,
@@ -429,18 +435,28 @@ def simplify_if(meta_block_graph: MetaBlockGraph) -> MetaBlockGraph:
                 # if it's a conjunction it would not have a next, only the parent can have a next
                 if child_next_loc is None and child_true_loc == false_loc: 
                     # print('simplifying')
-                    node.condition_blocks += true_node.condition_blocks
-                    node.false_address = child_false_loc
-                    node.conjunctions += [b' && '] + [b' && ' if c == b' || ' else b' || ' for c in true_node.conjunctions]
-                    node.flags = node.flags + true_node.flags.copy()
+                    meta_index[node.address] = replace(
+                        node,
+                        condition_blocks=node.condition_blocks + true_node.condition_blocks,
+                        false_address=child_false_loc,
+                        conjunctions=(
+                            node.conjunctions
+                            + (b' && ',)
+                            + tuple(b' && ' if c == b' || ' else b' || ' for c in true_node.conjunctions)
+                        ),
+                        flags=node.flags + true_node.flags,
+                    )
                     # repeat this until there are no simplifications
                     node_loc = node.address
                 elif child_next_loc is None and child_false_loc == false_loc:
                     # print('simplifying')
-                    node.condition_blocks += true_node.condition_blocks
-                    node.false_address = child_true_loc
-                    node.conjunctions += [b' && '] + true_node.conjunctions
-                    node.flags = node.flags + true_node.flags.copy()
+                    meta_index[node.address] = replace(
+                        node,
+                        condition_blocks=node.condition_blocks + true_node.condition_blocks,
+                        false_address=child_true_loc,
+                        conjunctions=node.conjunctions + (b' && ',) + true_node.conjunctions,
+                        flags=node.flags + true_node.flags,
+                    )
                     
                     # repeat this until there are no simplifications
                     node_loc = node.address

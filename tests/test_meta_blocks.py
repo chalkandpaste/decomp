@@ -1,10 +1,11 @@
 import contextlib
+from dataclasses import FrozenInstanceError
 import io
 import unittest
 
 from decomp.block_graph import generate_block_graph
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
-from decomp.meta_blocks import EndBlock, MetaBlockGraph
+from decomp.meta_blocks import EndBlock, IfBlock, LinearBlock, MetaBlockGraph, SwitchBlock
 from decomp.structure import annotate_graph
 
 
@@ -66,6 +67,44 @@ class MetaBlockTests(unittest.TestCase):
         )
 
         self.assertIs(graph.source_block_at(block.address), block)
+
+    def test_meta_blocks_normalize_sequence_fields_to_tuples(self) -> None:
+        if_block = IfBlock(
+            address=0x08020000,
+            condition_blocks=[0x08020000],
+            flags=[True],
+            conjunctions=[b" && "],
+            true_address=0x08020004,
+            false_address=None,
+            next_address=None,
+        )
+        linear_block = LinearBlock(
+            address=0x08020004,
+            block_addresses=[0x08020004, 0x08020008],
+            next_address=None,
+        )
+        switch_block = SwitchBlock(
+            address=0x08020008,
+            preface=[0x08020008],
+            cases=[0x08020010, 0x08020014],
+            next_address=None,
+        )
+
+        self.assertEqual(if_block.condition_blocks, (0x08020000,))
+        self.assertEqual(if_block.flags, (True,))
+        self.assertEqual(if_block.conjunctions, (b" && ",))
+        self.assertEqual(linear_block.block_addresses, (0x08020004, 0x08020008))
+        self.assertEqual(switch_block.preface, (0x08020008,))
+        self.assertEqual(switch_block.cases, (0x08020010, 0x08020014))
+
+    def test_meta_blocks_are_frozen(self) -> None:
+        node = EndBlock(
+            address=0x08020000,
+            block_addresses=[0x08020000],
+        )
+
+        with self.assertRaises(FrozenInstanceError):
+            node.block_addresses = ()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeAlias
 
@@ -9,18 +10,23 @@ from .legacy_types import LegacyBlock, LegacyBlockGraph, LegacyBlockIndex
 Address: TypeAlias = int
 
 
-@dataclass
+@dataclass(frozen=True)
 class IfBlock:
     address: Address
-    condition_blocks: list[Address]
-    flags: list[bool]
-    conjunctions: list[bytes]
+    condition_blocks: tuple[Address, ...]
+    flags: tuple[bool, ...]
+    conjunctions: tuple[bytes, ...]
     true_address: Address | None
     false_address: Address | None
     next_address: Address | None
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "condition_blocks", tuple(self.condition_blocks))
+        object.__setattr__(self, "flags", tuple(self.flags))
+        object.__setattr__(self, "conjunctions", tuple(self.conjunctions))
 
-@dataclass
+
+@dataclass(frozen=True)
 class WhileBlock:
     address: Address
     inner: "MetaBlock | None"
@@ -28,25 +34,35 @@ class WhileBlock:
     next_address: Address | None
 
 
-@dataclass
+@dataclass(frozen=True)
 class LinearBlock:
     address: Address
-    block_addresses: list[Address]
+    block_addresses: tuple[Address, ...]
     next_address: Address | None
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "block_addresses", tuple(self.block_addresses))
 
-@dataclass
+
+@dataclass(frozen=True)
 class SwitchBlock:
     address: Address
-    preface: list[Address]
+    preface: tuple[Address, ...]
     cases: tuple[Address, ...]
     next_address: Address | None
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "preface", tuple(self.preface))
+        object.__setattr__(self, "cases", tuple(self.cases))
 
-@dataclass
+
+@dataclass(frozen=True)
 class EndBlock:
     address: Address
-    block_addresses: list[Address]
+    block_addresses: tuple[Address, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "block_addresses", tuple(self.block_addresses))
 
 
 MetaBlock: TypeAlias = IfBlock | WhileBlock | LinearBlock | SwitchBlock | EndBlock
@@ -100,5 +116,5 @@ class MetaBlockGraph:
     def source_block_at(self, address: Address) -> LegacyBlock:
         return self.source_blocks[address]
 
-    def source_blocks_at(self, addresses: list[Address] | tuple[Address, ...]) -> tuple[LegacyBlock, ...]:
+    def source_blocks_at(self, addresses: Sequence[Address]) -> tuple[LegacyBlock, ...]:
         return tuple(self.source_block_at(address) for address in addresses)

@@ -172,6 +172,13 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_meta_block_records_are_frozen_and_tuple_backed(self) -> None:
+        record_names = {"EndBlock", "IfBlock", "LinearBlock", "SwitchBlock", "WhileBlock"}
+        path = Path("src/decomp/meta_blocks.py")
+
+        self.assertEqual(_unfrozen_dataclass_records(path, record_names), [])
+        self.assertEqual(_mutable_list_record_fields(path, record_names), [])
+
     def test_add_function_sigs_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _raw_numeric_subscripts_in_function(
@@ -616,6 +623,55 @@ def _legacy_meta_block_graph_block_index_access(path: Path) -> list[str]:
         if node.attr == "block_index":
             violations.append(f"{path}:{node.lineno} use MetaBlockGraph.source_blocks")
     return violations
+
+
+def _unfrozen_dataclass_records(path: Path, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef) or node.name not in names:
+            continue
+        if not _has_frozen_dataclass_decorator(node):
+            violations.append(f"{path}:{node.lineno} {node.name} should be a frozen dataclass")
+    return violations
+
+
+def _has_frozen_dataclass_decorator(node: ast.ClassDef) -> bool:
+    for decorator in node.decorator_list:
+        if not isinstance(decorator, ast.Call):
+            continue
+        if _call_name(decorator.func) != "dataclass":
+            continue
+        for keyword in decorator.keywords:
+            if keyword.arg == "frozen" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True:
+                return True
+    return False
+
+
+def _mutable_list_record_fields(path: Path, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef) or node.name not in names:
+            continue
+        for item in node.body:
+            if not isinstance(item, ast.AnnAssign):
+                continue
+            if _annotation_uses_list(item.annotation):
+                violations.append(f"{path}:{item.lineno} {node.name} fields should use tuple-backed values")
+    return violations
+
+
+def _annotation_uses_list(node: ast.AST) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id == "list"
+    if isinstance(node, ast.Attribute):
+        return node.attr == "List"
+    if isinstance(node, ast.Subscript):
+        return _annotation_uses_list(node.value)
+    if isinstance(node, ast.BinOp):
+        return _annotation_uses_list(node.left) or _annotation_uses_list(node.right)
+    return False
 
 
 def _raw_numeric_subscripts_in_function(path: Path, function_name: str, indexes: set[int]) -> list[str]:
