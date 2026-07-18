@@ -57,10 +57,23 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         for path in (
             Path("src/decomp/block_graph.py"),
             Path("src/decomp/function_signatures.py"),
+            Path("src/decomp/legacy_adapter.py"),
             Path("src/decomp/render_c.py"),
             Path("src/decomp/structure.py"),
         ):
             violations.extend(_raw_block_index_access(path))
+
+        self.assertEqual(violations, [])
+
+    def test_graph_driven_modules_do_not_read_raw_block_storage(self) -> None:
+        violations = []
+        for path in (
+            Path("src/decomp/block_graph.py"),
+            Path("src/decomp/function_signatures.py"),
+            Path("src/decomp/legacy_adapter.py"),
+            Path("src/decomp/render_c.py"),
+        ):
+            violations.extend(_raw_graph_storage_access(path))
 
         self.assertEqual(violations, [])
 
@@ -207,6 +220,19 @@ def _raw_block_index_access(path: Path) -> list[str]:
             continue
         if _subscript_root_name(node.value) == "block_index":
             violations.append(f"{path}:{node.lineno} use LegacyBlockGraph methods instead of block_index[...]")
+    return violations
+
+
+def _raw_graph_storage_access(path: Path) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute):
+            continue
+        if node.attr != "blocks":
+            continue
+        if isinstance(node.value, ast.Name) and node.value.id == "block_graph":
+            violations.append(f"{path}:{node.lineno} use LegacyBlockGraph methods instead of block_graph.blocks")
     return violations
 
 

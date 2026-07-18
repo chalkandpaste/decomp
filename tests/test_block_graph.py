@@ -37,6 +37,10 @@ class BlockGraphTests(unittest.TestCase):
             sorted(graph.addresses()),
             [0x08020000, 0x08020004, 0x08020008],
         )
+        self.assertEqual(
+            sorted(address for address, _block in graph.block_items()),
+            [0x08020000, 0x08020004, 0x08020008],
+        )
 
     def test_recurse_graph_callback_receives_graph_model(self) -> None:
         insns = [

@@ -9,12 +9,12 @@ from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 def legacy_block_graph_to_cfg(block_graph: LegacyBlockGraph, backend: ArmThumbBackend | None = None) -> ControlFlowGraph:
     backend = backend or ArmThumbBackend()
     start = block_graph.entry_address
-    legacy_blocks = block_graph.blocks
+    legacy_blocks = block_graph.block_items()
 
-    incoming: dict[int, list[Edge]] = {address: [] for address in legacy_blocks}
+    incoming: dict[int, list[Edge]] = {address: [] for address, _block in legacy_blocks}
     outgoing: dict[int, list[Edge]] = {}
 
-    for address, block in legacy_blocks.items():
+    for address, block in legacy_blocks:
         block_edges = []
         for index, child in enumerate(block.successors):
             edge = Edge(
@@ -27,7 +27,7 @@ def legacy_block_graph_to_cfg(block_graph: LegacyBlockGraph, backend: ArmThumbBa
         outgoing[address] = block_edges
 
     blocks = {}
-    for address, block in legacy_blocks.items():
+    for address, block in legacy_blocks:
         instructions = tuple(
             backend.decode_legacy_tokens(tokens)
             for tokens in block.instructions

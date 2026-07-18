@@ -78,6 +78,9 @@ class LegacyBlockGraph:
     def addresses(self) -> tuple[int, ...]:
         return tuple(self.blocks.keys())
 
+    def block_items(self) -> tuple[tuple[int, LegacyBlock], ...]:
+        return tuple(self.blocks.items())
+
     def successors(self, address: int) -> tuple[int, ...]:
         return self.block_at(address).successors
 
