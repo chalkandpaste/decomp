@@ -102,6 +102,12 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         self.assertEqual(_module_import_violations(block_graph_path, {"argparse"}), [])
         self.assertEqual(_module_main_guard_violations(block_graph_path), [])
 
+    def test_function_signatures_stays_out_of_cli_behavior(self) -> None:
+        function_signatures_path = Path("src/decomp/function_signatures.py")
+
+        self.assertEqual(_module_import_violations(function_signatures_path, {"argparse"}), [])
+        self.assertEqual(_module_main_guard_violations(function_signatures_path), [])
+
     def test_graph_driven_modules_do_not_index_raw_block_maps(self) -> None:
         violations = []
         for path in (

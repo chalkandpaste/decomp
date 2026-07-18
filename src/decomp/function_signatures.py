@@ -313,26 +313,3 @@ def generate_func_sigs(binary: bytes, entry_point_loc: int) -> bytes:
         func_comments[f] = b'; ' + return_type + args_type
 
     return func_comments
-
-    
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser('Provide input and output locations')
-    parser.add_argument('input_file', metavar='i', type=str, help="input file")
-    parser.add_argument('output_file', metavar='o', type=str, help="output file")
-    # parser.add_argument('func_loc', metavar='f', type=int, help="location to decompile")
-
-    args = parser.parse_args()
-
-    f = open(args.input_file, 'rb')
-
-    binary = f.read()
-
-    f.close()
-
-    output = generate_func_sigs( binary, 0x08020000 + 0xa4f4 )
-    # output = generate_asm( binary, 0x08020000 + 0xa4f4 )
-
-    g = open(args.output_file, 'wb')
-
-    g.write(output)
