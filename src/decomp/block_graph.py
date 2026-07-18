@@ -12,6 +12,7 @@ from .legacy_types import (
     LegacyInstruction,
     LegacyTraversalFn,
 )
+from .legacy_instruction import mnemonic, next_instruction_address, operand_int, table_targets
 
 import pickle
 import os.path
@@ -48,10 +49,10 @@ CACHE_VERSION = 4
 
 def get_children(block_list: list[LegacyInstruction]) -> list[int]:
     last_insn = block_list[-1]
-    end_insn = last_insn[3]
+    end_insn = mnemonic(last_insn)
     if end_insn in cond_block_end:
-        jump_loc = int(last_insn[4], 0)
-        next_block_loc = int(last_insn[0],0) + int(last_insn[1])
+        jump_loc = operand_int(last_insn, 0)
+        next_block_loc = next_instruction_address(last_insn)
 
         false_loc = next_block_loc
         true_loc = jump_loc
@@ -59,9 +60,8 @@ def get_children(block_list: list[LegacyInstruction]) -> list[int]:
         children = [true_loc, false_loc]
 
     elif end_insn in cond_block_end_zero:
-        jump_loc = int(last_insn[5], 0)
-
-        next_block_loc = int(last_insn[0],0) + int(last_insn[1])
+        jump_loc = operand_int(last_insn, 1)
+        next_block_loc = next_instruction_address(last_insn)
 
         false_loc = next_block_loc
         true_loc = jump_loc
@@ -69,14 +69,14 @@ def get_children(block_list: list[LegacyInstruction]) -> list[int]:
         children = [true_loc, false_loc]
 
     elif end_insn in uncond_block_end:
-        jump_loc = int(last_insn[4], 0)
+        jump_loc = operand_int(last_insn, 0)
         children = [jump_loc]
 
     elif end_insn in tbb:
-        children = last_insn[-1]
+        children = table_targets(last_insn)
 
     else:
-        child_loc = int(last_insn[0],0) + int(last_insn[1])
+        child_loc = next_instruction_address(last_insn)
         children = [child_loc]
 
     return children

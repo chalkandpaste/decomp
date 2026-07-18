@@ -122,6 +122,16 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_get_children_uses_legacy_instruction_accessors(self) -> None:
+        self.assertEqual(
+            _raw_numeric_subscripts_in_function(
+                Path("src/decomp/block_graph.py"),
+                "get_children",
+                {0, 1, 3, 4, 5},
+            ),
+            [],
+        )
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
