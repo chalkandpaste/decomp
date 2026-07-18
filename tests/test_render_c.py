@@ -1,6 +1,7 @@
 import unittest
 
 from decomp.legacy_types import LegacyBlock
+from decomp.meta_blocks import MetaBlockGraph
 from decomp.render_c import RenderedCondition, render_condition
 
 
@@ -17,7 +18,13 @@ class RenderCTests(unittest.TestCase):
             predecessors=(),
         )
 
-        rendered = render_condition([address], [], [True], {address: block})
+        graph = MetaBlockGraph(
+            block_index={address: block},
+            meta_blocks={},
+            entry_address=address,
+        )
+
+        rendered = render_condition([address], [], [True], graph)
 
         self.assertIsInstance(rendered, RenderedCondition)
         self.assertIn(b"cond0 = r0 != 0;", rendered.setup)

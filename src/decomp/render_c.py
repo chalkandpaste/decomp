@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from .function_signatures import get_function_signature
 from .instructions import *
-from .legacy_types import LegacyBlock, LegacyBlockGraph, LegacyBlockIndex
+from .legacy_types import LegacyBlock, LegacyBlockGraph
 from .meta_blocks import EndBlock, IfBlock, LinearBlock, MetaBlock, MetaBlockGraph, SwitchBlock, WhileBlock
 
 
@@ -35,7 +35,7 @@ def render_condition(
     cond: list[int],
     conj: list[bytes],
     flags: list[bool],
-    block_index: LegacyBlockIndex,
+    meta_block_graph: MetaBlockGraph,
 ) -> RenderedCondition:
 
     cond_out = b''
@@ -50,13 +50,13 @@ def render_condition(
     need_moar = False
     for c in conds:
         if not need_moar:
-            block = block_index[c]
+            block = meta_block_graph.source_block_at(c)
             block_out = print_block(block)
             insns = list(block.instructions)
             insns.reverse()
         else:
             need_moar = False
-            block = block_index[c]
+            block = meta_block_graph.source_block_at(c)
             block_out = print_block(block)
             new_insns = list(block.instructions)
             new_insns.reverse()
@@ -174,7 +174,6 @@ def render_condition(
 
 
 def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
-    block_index = meta_block_graph.block_index
     meta_index = meta_block_graph.meta_blocks
     start = meta_block_graph.entry_address
 
@@ -188,7 +187,7 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
             conj = node.conjunctions
             flags = node.flags
 
-            rendered_condition = render_condition(cond, conj, flags, block_index)
+            rendered_condition = render_condition(cond, conj, flags, meta_block_graph)
 
             true_loc = node.false_address
             false_loc = node.true_address
@@ -210,14 +209,14 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
             raise Exception # don't think we should come here, but otherwise pass
 
         elif isinstance(node, LinearBlock):
-            block_out = b'\n'.join( [print_block(block_index[b]) for b in node.block_addresses] )
+            block_out = b'\n'.join( [print_block(block) for block in meta_block_graph.source_blocks_at(node.block_addresses)] )
 
             out += block_out
             node_loc = node.next_address
             # print('next node_loc', node_loc)
 
         elif isinstance(node, EndBlock):
-            end_out = b'\n'.join( [print_block(block_index[b]) for b in node.block_addresses] )
+            end_out = b'\n'.join( [print_block(block) for block in meta_block_graph.source_blocks_at(node.block_addresses)] )
             end_out += b'\nreturn;\n'
             out += end_out
             node_loc = None
@@ -226,9 +225,9 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
             for (i,c) in enumerate(node.cases):
                 c_out += b'\ncase ' + bytes(str(i), 'utf-8') + b':\n' + print_node_loc(c)
 
-            block_out = b'\n'.join([print_block(block_index[i]) for i in node.preface])
+            block_out = b'\n'.join([print_block(block) for block in meta_block_graph.source_blocks_at(node.preface)])
 
-            switch_insn = block_index[node.preface[-1]].instructions[-1]
+            switch_insn = meta_block_graph.source_block_at(node.preface[-1]).instructions[-1]
             switch_var = crs(switch_insn[5])
 
 
@@ -250,7 +249,7 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
                 inner = node.inner
                 cond = node.condition_address
                 while_out = print_node(inner)
-                rendered_condition = render_condition([cond], [], [True], block_index)
+                rendered_condition = render_condition([cond], [], [True], meta_block_graph)
                 while_out = b'while (1) \n{\n' + while_out + rendered_condition.setup +\
                         b'if ( ' + rendered_condition.expression + b' ) {\n break;\n }\n' +\
                         b'\n}\n'

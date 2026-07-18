@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TypeAlias
 
-from .legacy_types import LegacyBlockIndex
+from .legacy_types import LegacyBlock, LegacyBlockIndex
 
 
 Address: TypeAlias = int
@@ -61,3 +61,9 @@ class MetaBlockGraph:
 
     def block_at(self, address: Address) -> MetaBlock:
         return self.meta_blocks[address]
+
+    def source_block_at(self, address: Address) -> LegacyBlock:
+        return self.block_index[address]
+
+    def source_blocks_at(self, addresses: list[Address] | tuple[Address, ...]) -> tuple[LegacyBlock, ...]:
+        return tuple(self.source_block_at(address) for address in addresses)
