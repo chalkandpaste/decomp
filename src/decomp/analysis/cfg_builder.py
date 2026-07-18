@@ -19,7 +19,7 @@ from decomp.instructions import (
     func_end,
     uncond_block_end,
 )
-from decomp.legacy_types import LegacyBlock, LegacyBlockGraph, LegacyBlockIndex, LegacyInstruction
+from decomp.legacy_types import LegacyBlock, LegacyBlockGraph, LegacyInstruction
 
 
 class InstructionSource(Protocol):
@@ -89,7 +89,7 @@ def build_control_flow_graph(source: InstructionSource, entry_point: int) -> Con
 
 def cfg_to_legacy_block_graph(cfg: ControlFlowGraph) -> LegacyBlockGraph:
     parents = _legacy_parent_index(cfg)
-    index: LegacyBlockIndex = {}
+    index: dict[int, LegacyBlock] = {}
 
     for address, block in cfg.block_items():
         index[address] = LegacyBlock(

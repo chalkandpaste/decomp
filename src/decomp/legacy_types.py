@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from types import MappingProxyType
 from typing import Callable, TypeAlias
 
 
 LegacyToken: TypeAlias = bytes | int | list[int]
 LegacyInstruction: TypeAlias = list[LegacyToken]
-LegacyBlockIndex: TypeAlias = dict[int, "LegacyBlock"]
+LegacyBlockIndex: TypeAlias = Mapping[int, "LegacyBlock"]
 LegacyRegisterScope: TypeAlias = dict[bytes, bool]
 
 @dataclass(frozen=True)
@@ -26,6 +28,9 @@ class LegacyBlock:
 class LegacyBlockGraph:
     blocks: LegacyBlockIndex
     entry_address: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "blocks", MappingProxyType(dict(self.blocks)))
 
     def block_at(self, address: int) -> LegacyBlock:
         return self.blocks[address]

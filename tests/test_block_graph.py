@@ -119,6 +119,33 @@ class BlockGraphTests(unittest.TestCase):
             (left.address,),
         )
 
+    def test_legacy_block_graph_blocks_are_read_only(self) -> None:
+        original = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020002,
+            instructions=(),
+            successors=(),
+            predecessors=(),
+        )
+        replacement = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020004,
+            instructions=(),
+            successors=(),
+            predecessors=(),
+        )
+        blocks = {original.address: original}
+        graph = LegacyBlockGraph(
+            blocks=blocks,
+            entry_address=original.address,
+        )
+
+        blocks[original.address] = replacement
+
+        self.assertIs(graph.block_at(original.address), original)
+        with self.assertRaises(TypeError):
+            graph.blocks[original.address] = replacement
+
     def test_unconditional_branch_has_single_jump_child(self) -> None:
         insns = [
             [b"0x8020000", b"2", b"0000", b"b", b"0x8020008"],
