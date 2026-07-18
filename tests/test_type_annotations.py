@@ -79,6 +79,9 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_block_graph_uses_explicit_instruction_imports(self) -> None:
+        self.assertEqual(_wildcard_imports(Path("src/decomp/block_graph.py")), [])
+
     def test_graph_driven_modules_do_not_index_raw_block_maps(self) -> None:
         violations = []
         for path in (
@@ -246,6 +249,17 @@ def _typing_any_imports(path: Path) -> list[str]:
         for alias in node.names:
             if alias.name == "Any":
                 imports.append(f"{path}:{node.lineno} imports typing.Any")
+    return imports
+
+
+def _wildcard_imports(path: Path) -> list[str]:
+    imports = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        if any(alias.name == "*" for alias in node.names):
+            imports.append(f"{path}:{node.lineno} avoid wildcard imports")
     return imports
 
 

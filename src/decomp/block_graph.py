@@ -1,5 +1,5 @@
 from .instruction_buffer import InstructionsBuffer
-from .instructions import *
+from .instructions import cond_block_end, cond_block_end_zero, tbb, uncond_block_end
 from .analysis.cfg_builder import (
     InstructionsBufferSource,
     LegacyTokenInstructionSource,
