@@ -331,6 +331,20 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
     def test_xrefs_use_typed_flow_and_operands(self) -> None:
         self.assertEqual(
+            _exact_import_violations(
+                Path("src/decomp/analysis/xrefs.py"),
+                {"decomp.instructions"},
+            ),
+            [],
+        )
+        self.assertEqual(
+            _forbidden_defs(
+                Path("src/decomp/analysis/xrefs.py"),
+                {"_mnemonic"},
+            ),
+            [],
+        )
+        self.assertEqual(
             _function_call_violations(
                 Path("src/decomp/analysis/xrefs.py"),
                 "_collect_block_references",
@@ -472,6 +486,19 @@ def _module_import_violations(path: Path, modules: set[str]) -> list[str]:
         if isinstance(node, ast.ImportFrom) and node.module is not None:
             if node.module.split(".", 1)[0] in modules:
                 violations.append(f"{path}:{node.lineno} keep {node.module} in CLI modules")
+    return violations
+
+
+def _exact_import_violations(path: Path, modules: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name in modules:
+                    violations.append(f"{path}:{node.lineno} keep {alias.name} behind a typed helper")
+        if isinstance(node, ast.ImportFrom) and node.module in modules:
+            violations.append(f"{path}:{node.lineno} keep {node.module} behind a typed helper")
     return violations
 
 

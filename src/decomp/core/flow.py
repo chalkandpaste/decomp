@@ -45,6 +45,12 @@ class FlowInfo:
             return self.targets
         return tuple(normalize(target) for target in self.targets)
 
+    def is_direct_call(self) -> bool:
+        return self.kind == FlowKind.CALL
+
+    def is_unconditional_branch(self) -> bool:
+        return self.kind == FlowKind.UNCONDITIONAL_BRANCH
+
     def successor_addresses(self, default_fallthrough: Address) -> tuple[Address, ...]:
         if self.kind == FlowKind.CONDITIONAL_BRANCH:
             if len(self.targets) != 1 or self.fallthrough is None:

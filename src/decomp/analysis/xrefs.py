@@ -4,16 +4,13 @@ from dataclasses import dataclass
 from enum import Enum
 
 from decomp.arch.arm_thumb.addresses import normalize_interworking_address
+from decomp.arch.arm_thumb.instruction_kinds import (
+    is_exchange_transfer,
+    is_move_to_register,
+    is_register_restore,
+)
 from decomp.core.cfg import BasicBlock, ControlFlowGraph
 from decomp.core.instruction import Instruction
-from decomp.instructions import (
-    exchange_func_call,
-    exchange_return,
-    func_call,
-    func_end,
-    move,
-    uncond_block_end,
-)
 
 
 class CallReferenceKind(str, Enum):
@@ -57,9 +54,7 @@ def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReferen
     instructions = block.instructions
 
     for index, instruction in enumerate(instructions):
-        mnemonic = _mnemonic(instruction)
-
-        if mnemonic in func_call:
+        if instruction.flow.is_direct_call():
             for target in instruction.flow.target_addresses(normalize_interworking_address):
                 references.append(
                     CallReference(
@@ -68,7 +63,7 @@ def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReferen
                         kind=CallReferenceKind.DIRECT_CALL,
                     )
                 )
-        elif mnemonic in exchange_func_call + exchange_return:
+        elif is_exchange_transfer(instruction):
             register = instruction.operand_register(0)
             if register != "lr":
                 target = _literal_loaded_into_register(instructions, index, register)
@@ -80,7 +75,7 @@ def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReferen
                             kind=CallReferenceKind.INDIRECT_LITERAL_CALL,
                         )
                     )
-        elif mnemonic in uncond_block_end:
+        elif instruction.flow.is_unconditional_branch():
             for target in instruction.flow.target_addresses(normalize_interworking_address):
                 if block.address == entry and target < entry:
                     references.append(
@@ -90,7 +85,7 @@ def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReferen
                             kind=CallReferenceKind.LOWER_TAIL_BRANCH,
                         )
                     )
-        elif mnemonic in func_end:
+        elif is_register_restore(instruction):
             references.extend(_tail_branches_after_restore(instructions, index))
 
     return references
@@ -99,7 +94,7 @@ def _collect_block_references(entry: int, block: BasicBlock) -> list[CallReferen
 def _tail_branches_after_restore(instructions: tuple[Instruction, ...], start_index: int) -> list[CallReference]:
     references = []
     for instruction in instructions[start_index:]:
-        if _mnemonic(instruction) in uncond_block_end:
+        if instruction.flow.is_unconditional_branch():
             for target in instruction.flow.target_addresses(normalize_interworking_address):
                 references.append(
                     CallReference(
@@ -119,7 +114,7 @@ def _literal_loaded_into_register(
     if register is None:
         return None
     for previous in reversed(instructions[:index]):
-        if _mnemonic(previous) in move and previous.operand_register(0) == register:
+        if is_move_to_register(previous, register):
             target = previous.operand_int(1)
             if target is not None:
                 return normalize_interworking_address(target)
@@ -136,7 +131,3 @@ def _dedupe_references(references: list[CallReference]) -> list[CallReference]:
         seen.add(key)
         deduped.append(reference)
     return deduped
-
-
-def _mnemonic(instruction: Instruction) -> bytes:
-    return instruction.mnemonic.encode("ascii")

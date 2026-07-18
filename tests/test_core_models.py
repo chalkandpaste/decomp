@@ -21,6 +21,12 @@ class CoreModelAdapterTests(unittest.TestCase):
 
         self.assertEqual(flow.target_addresses(lambda address: address & ~1), (0x08020010, 0x08020020))
 
+    def test_flow_info_reports_call_and_branch_predicates(self) -> None:
+        self.assertTrue(FlowInfo(kind=FlowKind.CALL).is_direct_call())
+        self.assertFalse(FlowInfo(kind=FlowKind.INDIRECT_CALL).is_direct_call())
+        self.assertTrue(FlowInfo(kind=FlowKind.UNCONDITIONAL_BRANCH).is_unconditional_branch())
+        self.assertFalse(FlowInfo(kind=FlowKind.CONDITIONAL_BRANCH).is_unconditional_branch())
+
     def test_flow_info_rejects_incomplete_conditional_branch_successors(self) -> None:
         flow = FlowInfo(kind=FlowKind.CONDITIONAL_BRANCH, targets=())
 

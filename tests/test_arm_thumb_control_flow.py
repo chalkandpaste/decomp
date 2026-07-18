@@ -7,6 +7,11 @@ from decomp.arch.arm_thumb.control_flow import (
     is_pc_return,
     is_return_to_link_register,
 )
+from decomp.arch.arm_thumb.instruction_kinds import (
+    is_exchange_transfer,
+    is_move_to_register,
+    is_register_restore,
+)
 
 
 class ArmThumbControlFlowTests(unittest.TestCase):
@@ -46,6 +51,24 @@ class ArmThumbControlFlowTests(unittest.TestCase):
     def test_normalizes_interworking_addresses(self) -> None:
         self.assertEqual(normalize_interworking_address(0x08030001), 0x08030000)
         self.assertEqual(normalize_interworking_address(0x08030000), 0x08030000)
+
+    def test_classifies_exchange_transfer_instructions(self) -> None:
+        blx = self.backend.decode_legacy_tokens([b"0x8020000", b"2", b"0000", b"blx", b"r0"])
+        bx = self.backend.decode_legacy_tokens([b"0x8020002", b"2", b"0000", b"bx", b"r0"])
+
+        self.assertTrue(is_exchange_transfer(blx))
+        self.assertTrue(is_exchange_transfer(bx))
+
+    def test_classifies_register_restore_instructions(self) -> None:
+        restore = self.backend.decode_legacy_tokens([b"0x8020000", b"2", b"0000", b"pop", b"{r4,", b"lr}"])
+
+        self.assertTrue(is_register_restore(restore))
+
+    def test_classifies_register_move_instructions(self) -> None:
+        move = self.backend.decode_legacy_tokens([b"0x8020000", b"2", b"0000", b"mov", b"r0,", b"0x8034f49"])
+
+        self.assertTrue(is_move_to_register(move, "r0"))
+        self.assertFalse(is_move_to_register(move, "r1"))
 
 
 if __name__ == "__main__":
