@@ -13,7 +13,6 @@ from .legacy_types import (
 
 import pickle
 import os.path
-import argparse
 
 CACHE_VERSION = 4
 
@@ -98,43 +97,3 @@ def generate_block_graph(
         cache_bg(entry_point_loc, block_graph)
 
     return block_graph
-
-if __name__ == "__main__":
-    from .render_asm import generate_asm
-
-    parser = argparse.ArgumentParser('Provide input and output locations')
-    parser.add_argument('input_file', metavar='i', type=str, help="input file")
-    parser.add_argument('output_file', metavar='o', type=str, help="output file")
-    parser.add_argument('entry_loc', metavar='e', type=str, help="entry_loc")
-    # parser.add_argument('func_loc', metavar='f', type=int, help="location to decompile")
-
-    args = parser.parse_args()
-
-    entry_loc = int(args.entry_loc, 0)
-
-    f = open(args.input_file, 'rb')
-
-    override_input = [l.split(b' ') for l in f.read().split(b'\n')]
-    override_input = [l for l in override_input if l != [ b'' ]]
-    override_input2 = []
-    for l in override_input:
-        if l[3] == b'tbb':
-            insn = l[0:6]
-            locs = [int(i.rstrip(b','),0) for i in l[6:-1]]
-            insn.append(locs)
-
-            print(insn)
-        else:
-            insn = l
-
-        override_input2.append(insn)
-
-    override_input = override_input2
-
-    f.close()
-
-    output = generate_asm( None, entry_loc, False, override_input)
-
-    g = open(args.output_file, 'wb')
-
-    g.write(output)

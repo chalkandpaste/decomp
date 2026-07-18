@@ -96,6 +96,12 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_block_graph_stays_out_of_cli_behavior(self) -> None:
+        block_graph_path = Path("src/decomp/block_graph.py")
+
+        self.assertEqual(_module_import_violations(block_graph_path, {"argparse"}), [])
+        self.assertEqual(_module_main_guard_violations(block_graph_path), [])
+
     def test_graph_driven_modules_do_not_index_raw_block_maps(self) -> None:
         violations = []
         for path in (
@@ -283,6 +289,52 @@ def _wildcard_imports(path: Path) -> list[str]:
         if any(alias.name == "*" for alias in node.names):
             imports.append(f"{path}:{node.lineno} avoid wildcard imports")
     return imports
+
+
+def _module_import_violations(path: Path, modules: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.split(".", 1)[0] in modules:
+                    violations.append(f"{path}:{node.lineno} keep {alias.name} in CLI modules")
+        if isinstance(node, ast.ImportFrom) and node.module is not None:
+            if node.module.split(".", 1)[0] in modules:
+                violations.append(f"{path}:{node.lineno} keep {node.module} in CLI modules")
+    return violations
+
+
+def _module_main_guard_violations(path: Path) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If) and _is_main_guard(node):
+            violations.append(f"{path}:{node.lineno} keep __main__ entrypoints in CLI modules")
+    return violations
+
+
+def _is_main_guard(node: ast.If) -> bool:
+    test = node.test
+    if not isinstance(test, ast.Compare):
+        return False
+    if len(test.ops) != 1 or not isinstance(test.ops[0], ast.Eq):
+        return False
+    if len(test.comparators) != 1:
+        return False
+    return (
+        _is_name_constant_pair(test.left, test.comparators[0], "__name__", "__main__")
+        or _is_name_constant_pair(test.comparators[0], test.left, "__name__", "__main__")
+    )
+
+
+def _is_name_constant_pair(left: ast.AST, right: ast.AST, name: str, value: str) -> bool:
+    return (
+        isinstance(left, ast.Name)
+        and left.id == name
+        and isinstance(right, ast.Constant)
+        and right.value == value
+    )
 
 
 def _legacy_record_string_key_access(path: Path) -> list[str]:
