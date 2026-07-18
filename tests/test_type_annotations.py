@@ -41,6 +41,17 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(_forbidden_defs(disassemble_path, {"MetaBlockFinder", "annotate_graph", "simplify_if"}), [])
 
+    def test_rendering_stays_out_of_disassemble_module(self) -> None:
+        disassemble_path = Path("src/decomp/disassemble.py")
+
+        self.assertEqual(
+            _forbidden_defs(
+                disassemble_path,
+                {"print_block", "print_if_cond", "generate_func_cf_from_graph", "generate_func_decl"},
+            ),
+            [],
+        )
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
@@ -164,7 +175,7 @@ def _forbidden_defs(path: Path, names: set[str]) -> list[str]:
         if not isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
             continue
         if node.name in names:
-            violations.append(f"{path}:{node.lineno} {node.name} belongs in structure.py")
+            violations.append(f"{path}:{node.lineno} {node.name} belongs in a focused module")
     return violations
 
 
