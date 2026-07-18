@@ -1,0 +1,40 @@
+import contextlib
+import io
+import unittest
+
+from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
+from decomp.loop_tracker import LoopTracker
+
+
+class LoopTrackerTests(unittest.TestCase):
+    def test_loop_tracker_uses_block_graph_model(self) -> None:
+        first = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020002,
+            instructions=(),
+            successors=(0x08020002,),
+            predecessors=(0x08020002,),
+        )
+        second = LegacyBlock(
+            address=0x08020002,
+            end_address=0x08020004,
+            instructions=(),
+            successors=(0x08020000,),
+            predecessors=(0x08020000,),
+        )
+        graph = LegacyBlockGraph(
+            blocks={
+                first.address: first,
+                second.address: second,
+            },
+            entry_address=first.address,
+        )
+
+        tracker = LoopTracker(graph)
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertTrue(tracker.can_loop(first.address))
+
+
+if __name__ == "__main__":
+    unittest.main()

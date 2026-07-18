@@ -1,14 +1,14 @@
-from .legacy_types import LegacyBlockIndex
+from .legacy_types import LegacyBlockGraph
 
 
 class LoopTracker:
 
-    def __init__(self, block_index: LegacyBlockIndex) -> None:
-        self.block_index = block_index
-        self.loc_to_loop_end = {}
-        self.loc_to_loop_start = {}
-        self.loc_to_loop_locs = {}
-        self.not_loop_loc = {} # locs which are not in a loop
+    def __init__(self, graph: LegacyBlockGraph) -> None:
+        self.graph = graph
+        self.loc_to_loop_end: dict[int, int | None] = {}
+        self.loc_to_loop_start: dict[int, int | None] = {}
+        self.loc_to_loop_locs: dict[int, list[int]] = {}
+        self.not_loop_loc: dict[int, bool] = {} # locs which are not in a loop
 
     def is_loop_start(self, loc: int) -> bool | None:
         # print('is_loop_start', hex(loc))
@@ -78,7 +78,7 @@ class LoopTracker:
 
         while len(search_locs) > 0:
             loc = search_locs.pop(0)
-            block = self.block_index[loc]
+            block = self.graph.block_at(loc)
 
             seen[loc] = True
 
@@ -104,7 +104,7 @@ class LoopTracker:
                 if loc in reachable:
                     return True
 
-                p_locs = self.block_index[loc].predecessors
+                p_locs = self.graph.predecessors(loc)
                 for p in p_locs:
                     if p not in seen and p not in search_locs:
                         search_locs.append(p)
@@ -152,7 +152,7 @@ class LoopTracker:
             loc = search_locs.pop(-1)
             seen[loc] = True
 
-            c_locs = [c for c in self.block_index[loc].successors]
+            c_locs = [c for c in self.graph.successors(loc)]
 
             for c in c_locs:
                 # only need one counter-example
@@ -184,14 +184,13 @@ class LoopTracker:
                 if self._check_loop(loc, dont_follow):
                     if loc not in dont_follow:
                         loop_locs.append(loc)
-                    for c in self.block_index[loc].successors:
+                    for c in self.graph.successors(loc):
                         if c not in seen and c not in dont_follow and c not in search_locs:
                             search_locs.append(c)
                 else:
                     self.not_loop_loc[loc] = True
 
-            children_locs = [c for c in self.block_index[loc].successors]
-            # print('children_locs', [hex(c) for c in children_locs])
+            # print('children_locs', [hex(c) for c in self.graph.successors(loc)])
 
 
         # expand    
@@ -199,12 +198,9 @@ class LoopTracker:
         # additional_locs = []
 
         # for loc in loop_locs:
-            # c_locs = self.block_index[loc]['children']
-            # for c in c_locs:
-                # if c not in loop_locs:
-                    # c_children = self.block_index[c]['children']
-                    # if len(c_children) == 0:
-                        # additional_locs.append(c)
+            # for c in self.graph.successors(loc):
+                # if c not in loop_locs and len(self.graph.successors(c)) == 0:
+                    # additional_locs.append(c)
 
         # loop_locs += additional_locs
 
@@ -212,13 +208,13 @@ class LoopTracker:
         exit_loc = None
 
         for loc in loop_locs:
-            p_locs = self.block_index[loc].predecessors
+            p_locs = self.graph.predecessors(loc)
             for p in p_locs:
                 if p not in loop_locs:
                     entrance_loc = loc
 
            
-            c_locs = self.block_index[loc].successors
+            c_locs = self.graph.successors(loc)
             for c in c_locs:
                 if c not in loop_locs:
                     exit_loc = loc
@@ -226,7 +222,7 @@ class LoopTracker:
         # odd case of being a function end (i.e., loop with no return)
         # if exit_loc is None:
             # for loc in loop_locs:
-                # c_locs = self.block_index[loc]['children']
+                # c_locs = self.graph.successors(loc)
                 # if len(c_locs) == 1 and (c_locs[0] == entrance_loc): # or entrance_loc is None): 
                     # exit_loc = loc
 
@@ -234,7 +230,7 @@ class LoopTracker:
         # odd case of being a function start
         if entrance_loc is None:
             for loc in loop_locs:
-                p_locs = self.block_index[loc].predecessors
+                p_locs = self.graph.predecessors(loc)
                 if len(p_locs) == 1 and p_locs[0] == exit_loc: 
                     entrance_loc = loc
 

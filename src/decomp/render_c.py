@@ -1,9 +1,23 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .function_signatures import get_function_signature
 from .instructions import *
 from .legacy_types import LegacyBlock, LegacyBlockGraph, LegacyBlockIndex
 from .meta_blocks import EndBlock, IfBlock, LinearBlock, MetaBlock, MetaBlockGraph, SwitchBlock, WhileBlock
+
+
+@dataclass(frozen=True)
+class RenderedCondition:
+    setup: bytes
+    expression: bytes
+
+
+@dataclass(frozen=True)
+class RenderedNodeStep:
+    next_address: int | None
+    body: bytes
 
 
 def print_block(block: LegacyBlock) -> bytes:
@@ -17,15 +31,15 @@ def print_block(block: LegacyBlock) -> bytes:
     return prefix + body + suffix
 
 
-def print_if_cond(
+def render_condition(
     cond: list[int],
     conj: list[bytes],
     flags: list[bool],
     block_index: LegacyBlockIndex,
-) -> tuple[bytes, bytes]:
+) -> RenderedCondition:
 
     cond_out = b''
-    cond_exprs = []
+    cond_exprs: list[bytes] = []
     count = 0
 
     # print('cond', [hex(c) for c in cond])
@@ -156,7 +170,7 @@ def print_if_cond(
         else:
             cond_expr += cond_exprs[0] 
 
-    return cond_out, cond_expr
+    return RenderedCondition(setup=cond_out, expression=cond_expr)
 
 
 def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
@@ -164,9 +178,9 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
     meta_index = meta_block_graph.meta_blocks
     start = meta_block_graph.entry_address
 
-    seen_loops = {} # prevent loops...
+    seen_loops: set[int] = set()
 
-    def print_base_node(node: MetaBlock) -> tuple[int | None, bytes]:
+    def print_base_node(node: MetaBlock) -> RenderedNodeStep:
         out = b''
         if isinstance(node, IfBlock):
             # print("if node")
@@ -174,14 +188,14 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
             conj = node.conjunctions
             flags = node.flags
 
-            cond_block_out, cond_expr = print_if_cond(cond, conj, flags, block_index)
+            rendered_condition = render_condition(cond, conj, flags, block_index)
 
             true_loc = node.false_address
             false_loc = node.true_address
             if true_loc is None or true_loc == node.next_address or true_loc in seen_loops:
-                true_out = b'if ( ' + cond_expr + b' ) \n{\n\n}\n'
+                true_out = b'if ( ' + rendered_condition.expression + b' ) \n{\n\n}\n'
             else:
-                true_out = b'if ( ' + cond_expr + b' ) \n{\n' + print_node_loc(true_loc) + b'\n}\n'
+                true_out = b'if ( ' + rendered_condition.expression + b' ) \n{\n' + print_node_loc(true_loc) + b'\n}\n'
 
             if false_loc is None or false_loc == node.next_address or false_loc in seen_loops or false_loc is None:
                 false_out = b''
@@ -189,7 +203,7 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
                 false_out = b'else\n{\n' + print_node_loc(false_loc) + b'\n}\n'
 
 
-            out += (cond_block_out + true_out + false_out)
+            out += (rendered_condition.setup + true_out + false_out)
             node_loc = node.next_address
 
         elif isinstance(node, WhileBlock):
@@ -223,7 +237,7 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
         else:
             print("node", node)
             raise Exception
-        return node_loc, out
+        return RenderedNodeStep(next_address=node_loc, body=out)
 
     def print_node(node: MetaBlock | None) -> bytes:
         out = b''
@@ -232,22 +246,23 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
             if isinstance(node, WhileBlock):
                 # print("while node")
                 node_loc = node.address
-                seen_loops[node_loc] = True
+                seen_loops.add(node_loc)
                 inner = node.inner
                 cond = node.condition_address
                 while_out = print_node(inner)
-                cond_out,cond_expr = print_if_cond([cond], [], [True], block_index)
-                while_out = b'while (1) \n{\n' + while_out + cond_out +\
-                        b'if ( ' + cond_expr + b' ) {\n break;\n }\n' +\
+                rendered_condition = render_condition([cond], [], [True], block_index)
+                while_out = b'while (1) \n{\n' + while_out + rendered_condition.setup +\
+                        b'if ( ' + rendered_condition.expression + b' ) {\n break;\n }\n' +\
                         b'\n}\n'
                 out += while_out
                 
                 node_loc = node.next_address
             else:
                 # print("base node")
-                node_loc, base_out = print_base_node(node)
+                rendered_step = print_base_node(node)
 
-                out += base_out
+                node_loc = rendered_step.next_address
+                out += rendered_step.body
 
             # if node_loc is not None:
                 # # print("node next", hex(node_loc))

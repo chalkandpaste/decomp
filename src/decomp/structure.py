@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .loop_tracker import LoopTracker
-from .legacy_types import LegacyBlockGraph, LegacyBlockIndex
+from .legacy_types import LegacyBlockGraph
 from .meta_blocks import (
     EndBlock,
     IfBlock,
@@ -15,12 +15,8 @@ from .meta_blocks import (
 
 class MetaBlockFinder(LoopTracker):
 
-    def __init__(self, block_index: LegacyBlockIndex) -> None:
-        self.block_index = block_index
-        self.loc_to_loop_end = {}
-        self.loc_to_loop_start = {}
-        self.loc_to_loop_locs = {}
-        self.not_loop_loc = {} # locs which are not in a loop
+    def __init__(self, graph: LegacyBlockGraph) -> None:
+        super().__init__(graph)
 
 
     def all_seen_are_reachable(self, reachable: list[int], end_loc: int | None) -> bool:
@@ -28,7 +24,7 @@ class MetaBlockFinder(LoopTracker):
         if len(reachable) == 0:
             return False
         for loc in reachable:
-            block = self.block_index[loc]
+            block = self.graph.block_at(loc)
             
             retrace_nodes = [block]
             tally = { }
@@ -37,7 +33,7 @@ class MetaBlockFinder(LoopTracker):
 
             while len(retrace_nodes) > 0:
                 block = retrace_nodes.pop(-1)
-                children = [self.block_index[i] for i in block.successors]
+                children = [self.graph.block_at(i) for i in block.successors]
 
                 tally[block.address] = True
                 visited.append(block.address)
@@ -81,7 +77,7 @@ class MetaBlockFinder(LoopTracker):
 
             while len(retrace_nodes) > 0:
                 loc = retrace_nodes.pop(0)
-                c_locs = self.block_index[loc].successors
+                c_locs = self.graph.successors(loc)
 
 
                 if self.is_loop_start(loc) and loc not in seen_loops:
@@ -107,7 +103,7 @@ class MetaBlockFinder(LoopTracker):
             try:
                 while len(retrace_nodes2) > 0:
                     loc = retrace_nodes2.pop(0)
-                    c_locs = self.block_index[loc].successors
+                    c_locs = self.graph.successors(loc)
                     
                     # print("checking", hex(loc))
                     # print([hex(v) for v in paths_index[loc]])
@@ -116,7 +112,7 @@ class MetaBlockFinder(LoopTracker):
                             not self.is_loop_end(loc) and\
                             self.all_seen_are_reachable(paths_index[loc], loc) and\
                             not (self.get_loop_start(loc) in seen_loops2 and self.can_loop(loc)):
-                        if not (len(c_locs) == 1 and len(self.block_index[c_locs[0]].predecessors) == 1):
+                        if not (len(c_locs) == 1 and len(self.graph.predecessors(c_locs[0])) == 1):
                             intersection = loc
                             break
                 
@@ -156,7 +152,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
     start_loc = block_graph.start_block.address
     block_index = block_graph.blocks
 
-    mbf = MetaBlockFinder(block_index)
+    mbf = MetaBlockFinder(block_graph)
 
     meta_block_index = {}
     meta_block_start = start_loc

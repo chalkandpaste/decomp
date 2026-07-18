@@ -62,7 +62,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
     block_index = block_graph.blocks
     print('get_function_signature', hex(start_block.address))
 
-    loop_tracker = LoopTracker(block_index)
+    loop_tracker = LoopTracker(block_graph)
     loops = {}
 
     search_locs = [start_block.address]
