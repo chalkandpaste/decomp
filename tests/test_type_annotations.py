@@ -242,6 +242,15 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_loop_tracker_loop_accessors_do_not_keep_dead_branches(self) -> None:
+        self.assertEqual(
+            _statements_after_return_in_functions(
+                Path("src/decomp/loop_tracker.py"),
+                {"get_loop_end", "get_loop_start"},
+            ),
+            [],
+        )
+
     def test_add_function_sigs_uses_legacy_instruction_accessors(self) -> None:
         self.assertEqual(
             _exact_import_violations(
@@ -1106,6 +1115,30 @@ def _annotation_mentions_name(node: ast.AST, name: str) -> bool:
     if isinstance(node, ast.BinOp):
         return _annotation_mentions_name(node.left, name) or _annotation_mentions_name(node.right, name)
     return False
+
+
+def _statements_after_return_in_functions(path: Path, function_names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name not in function_names:
+            continue
+        violations.extend(_statements_after_return(path, node.body, node.name))
+    return violations
+
+
+def _statements_after_return(path: Path, statements: list[ast.stmt], function_name: str) -> list[str]:
+    violations = []
+    saw_return = False
+    for statement in statements:
+        if saw_return:
+            violations.append(f"{path}:{statement.lineno} {function_name} has unreachable code after return")
+        if isinstance(statement, ast.Return):
+            saw_return = True
+        elif isinstance(statement, ast.If):
+            violations.extend(_statements_after_return(path, statement.body, function_name))
+            violations.extend(_statements_after_return(path, statement.orelse, function_name))
+    return violations
 
 
 def _raw_numeric_subscripts_in_function(path: Path, function_name: str, indexes: set[int]) -> list[str]:

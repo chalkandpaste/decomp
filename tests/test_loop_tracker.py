@@ -7,22 +7,20 @@ from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
 from decomp.loop_tracker import LoopTracker
 
 
+def _legacy_block(address: int, successors: tuple[int, ...], predecessors: tuple[int, ...]) -> LegacyBlock:
+    return LegacyBlock(
+        address=address,
+        end_address=address + 2,
+        instructions=(),
+        successors=successors,
+        predecessors=predecessors,
+    )
+
+
 class LoopTrackerTests(unittest.TestCase):
     def test_loop_tracker_uses_block_graph_model(self) -> None:
-        first = LegacyBlock(
-            address=0x08020000,
-            end_address=0x08020002,
-            instructions=(),
-            successors=(0x08020002,),
-            predecessors=(0x08020002,),
-        )
-        second = LegacyBlock(
-            address=0x08020002,
-            end_address=0x08020004,
-            instructions=(),
-            successors=(0x08020000,),
-            predecessors=(0x08020000,),
-        )
+        first = _legacy_block(0x08020000, (0x08020002,), (0x08020002,))
+        second = _legacy_block(0x08020002, (0x08020000,), (0x08020000,))
         graph = LegacyBlockGraph(
             blocks={
                 first.address: first,
@@ -37,6 +35,32 @@ class LoopTrackerTests(unittest.TestCase):
             self.assertTrue(tracker.can_loop(first.address))
 
         self.assertEqual(tracker.loc_to_loop_locs[first.address], (first.address, second.address))
+        self.assertIsNone(tracker.get_loop_start(first.address))
+        self.assertIsNone(tracker.get_loop_end(first.address))
+
+    def test_loop_tracker_exposes_cached_loop_boundaries_for_structured_loop(self) -> None:
+        entry = _legacy_block(0x08020000, (0x08020002,), ())
+        loop_start = _legacy_block(0x08020002, (0x08020004,), (entry.address, 0x08020004))
+        loop_end = _legacy_block(0x08020004, (loop_start.address, 0x08020006), (loop_start.address,))
+        exit_block = _legacy_block(0x08020006, (), (loop_end.address,))
+        graph = LegacyBlockGraph(
+            blocks={
+                entry.address: entry,
+                loop_start.address: loop_start,
+                loop_end.address: loop_end,
+                exit_block.address: exit_block,
+            },
+            entry_address=entry.address,
+        )
+        tracker = LoopTracker(graph)
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertTrue(tracker.can_loop(loop_start.address))
+
+        self.assertEqual(tracker.get_loop_start(loop_start.address), loop_start.address)
+        self.assertEqual(tracker.get_loop_start(loop_end.address), loop_start.address)
+        self.assertEqual(tracker.get_loop_end(loop_start.address), loop_end.address)
+        self.assertEqual(tracker.get_loop_end(loop_end.address), loop_end.address)
 
     def test_loop_tracker_accepts_typed_control_flow_graph(self) -> None:
         first = BasicBlock(
@@ -67,13 +91,7 @@ class LoopTrackerTests(unittest.TestCase):
             self.assertTrue(tracker.can_loop(first.address))
 
     def test_loop_tracker_tracks_non_loop_locations_with_set_membership(self) -> None:
-        block = LegacyBlock(
-            address=0x08020000,
-            end_address=0x08020002,
-            instructions=(),
-            successors=(),
-            predecessors=(),
-        )
+        block = _legacy_block(0x08020000, (), ())
         graph = LegacyBlockGraph(
             blocks={block.address: block},
             entry_address=block.address,
@@ -84,6 +102,20 @@ class LoopTrackerTests(unittest.TestCase):
             self.assertFalse(tracker.can_loop(block.address))
 
         self.assertEqual(tracker.not_loop_loc, {block.address})
+        self.assertIsNone(tracker.get_loop_start(block.address))
+        self.assertIsNone(tracker.get_loop_end(block.address))
+
+    def test_loop_start_and_end_accessors_do_not_trigger_detection(self) -> None:
+        block = _legacy_block(0x08020000, (), ())
+        graph = LegacyBlockGraph(
+            blocks={block.address: block},
+            entry_address=block.address,
+        )
+        tracker = LoopTracker(graph)
+
+        self.assertIsNone(tracker.get_loop_start(block.address))
+        self.assertIsNone(tracker.get_loop_end(block.address))
+        self.assertEqual(tracker.not_loop_loc, set())
 
 
 if __name__ == "__main__":

@@ -34,16 +34,7 @@ class LoopTracker:
                 return loc == self.loc_to_loop_start[loc]
     
     def get_loop_start(self, loc: int) -> int | None:
-        if loc in self.loc_to_loop_start:
-            return self.loc_to_loop_start[loc]
-        elif loc not in self.not_loop_loc:
-            return None
-        else:
-            return self.detect_loop(loc)
-            if loc in self.loc_to_loop_end:
-                return self.loc_to_loop_end[loc]
-            else:
-                return None
+        return self.loc_to_loop_start.get(loc)
     
     def is_loop_end(self, loc: int) -> bool | None:
         # print('is_loop_end', hex(loc))
@@ -57,16 +48,7 @@ class LoopTracker:
                 return loc == self.loc_to_loop_end[loc]
     
     def get_loop_end(self, loc: int) -> int | None:
-        if loc in self.loc_to_loop_end:
-            return self.loc_to_loop_end[loc]
-        elif loc not in self.not_loop_loc:
-            return None
-        else:
-            return self.detect_loop(loc)
-            if loc in self.loc_to_loop_end:
-                return self.loc_to_loop_end[loc]
-            else:
-                return None
+        return self.loc_to_loop_end.get(loc)
 
     def can_loop(self, loc: int) -> bool:
         # print('can_loop', hex(loc))
