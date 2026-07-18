@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .arch import ArchitectureBehavior
 from .block_graph import generate_block_graph
 from .function_signatures import (
     RegisterSignature,
@@ -28,7 +29,11 @@ class FunctionDiscovery:
         return tuple(funcs)
 
 
-def discover_functions(binary: bytes, entry_point_loc: int) -> FunctionDiscovery:
+def discover_functions(
+    binary: bytes,
+    entry_point_loc: int,
+    behavior: ArchitectureBehavior | None = None,
+) -> FunctionDiscovery:
     search_locs = [entry_point_loc]
     func_call_graph: dict[int, tuple[int, ...]] = {}
     func_block_graph: dict[int, LegacyBlockGraph] = {}
@@ -37,7 +42,7 @@ def discover_functions(binary: bytes, entry_point_loc: int) -> FunctionDiscovery
         loc = search_locs.pop(0)
         block_graph = generate_block_graph(binary, loc)
         func_block_graph[loc] = block_graph
-        functions = tuple(collect_functions(block_graph))
+        functions = tuple(collect_functions(block_graph, behavior))
         func_call_graph[loc] = functions
         for f in functions:
             if f not in func_call_graph and f not in search_locs and f not in skip_functions:
@@ -50,18 +55,26 @@ def discover_functions(binary: bytes, entry_point_loc: int) -> FunctionDiscovery
     )
 
 
-def generate_set_of_funcs(binary: bytes, entry_point_loc: int) -> list[int]:
-    discovery = discover_functions(binary, entry_point_loc)
+def generate_set_of_funcs(
+    binary: bytes,
+    entry_point_loc: int,
+    behavior: ArchitectureBehavior | None = None,
+) -> list[int]:
+    discovery = discover_functions(binary, entry_point_loc, behavior)
     return list(set(discovery.called_functions()))
 
 
-def generate_func_sigs(binary: bytes, entry_point_loc: int) -> dict[int, bytes]:
-    discovery = discover_functions(binary, entry_point_loc)
+def generate_func_sigs(
+    binary: bytes,
+    entry_point_loc: int,
+    behavior: ArchitectureBehavior | None = None,
+) -> dict[int, bytes]:
+    discovery = discover_functions(binary, entry_point_loc, behavior)
     func_signatures: dict[int, RegisterSignature] = {}
 
     for f in discovery.called_functions():
         block_graph = discovery.block_graphs[f]
-        func_signatures[f] = get_function_signature(block_graph)
+        func_signatures[f] = get_function_signature(block_graph, behavior)
 
     func_comments = {}
 

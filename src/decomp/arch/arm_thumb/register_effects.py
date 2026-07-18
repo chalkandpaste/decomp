@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
+from decomp.arch.base import RegisterEffect
 from decomp.core.instruction import Instruction
 from decomp.instructions import (
     add,
@@ -34,12 +33,6 @@ from decomp.instructions import (
     vmlas,
     vpop,
 )
-
-
-@dataclass(frozen=True)
-class RegisterEffect:
-    reads: tuple[bytes, ...] = ()
-    writes: tuple[bytes, ...] = ()
 
 
 class UnsupportedRegisterEffect(ValueError):

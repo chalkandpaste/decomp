@@ -2,6 +2,9 @@ import contextlib
 import io
 import unittest
 
+from decomp.arch import RegisterEffect
+from decomp.arch.arm_thumb import ArmThumbArchitectureBehavior
+from decomp.core.instruction import Instruction
 from decomp.function_signatures import (
     ArgumentDeclaration,
     FunctionDeclaration,
@@ -13,6 +16,11 @@ from decomp.function_signatures import (
     render_function_declaration,
 )
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
+
+
+class NoRegisterEffectBehavior(ArmThumbArchitectureBehavior):
+    def register_effect(self, instruction: Instruction) -> RegisterEffect | None:
+        return None
 
 
 class FunctionSignatureTests(unittest.TestCase):
@@ -79,6 +87,19 @@ class FunctionSignatureTests(unittest.TestCase):
 
         self.assertTrue(signature.return_scope.uses(b"r0"))
         self.assertFalse(signature.return_scope.uses(b"r1"))
+        self.assertFalse(signature.argument_scope.uses(b"r0"))
+
+    def test_signature_traversal_accepts_architecture_behavior(self) -> None:
+        graph = _single_block_graph(
+            [
+                [b"0x8020000", b"2", b"0000", b"mov", b"r0,", b"1"],
+                [b"0x8020002", b"2", b"0000", b"bx", b"lr"],
+            ]
+        )
+
+        signature = _quiet_signature(graph, behavior=NoRegisterEffectBehavior())
+
+        self.assertFalse(signature.return_scope.uses(b"r0"))
         self.assertFalse(signature.argument_scope.uses(b"r0"))
 
     def test_detects_store_input_registers_as_arguments(self) -> None:
@@ -226,9 +247,12 @@ def _single_block_graph(instructions: list[list[object]]) -> LegacyBlockGraph:
     return LegacyBlockGraph(entry_address=block.address, blocks={block.address: block})
 
 
-def _quiet_signature(block_graph: LegacyBlockGraph) -> RegisterSignature:
+def _quiet_signature(
+    block_graph: LegacyBlockGraph,
+    behavior: ArmThumbArchitectureBehavior | None = None,
+) -> RegisterSignature:
     with contextlib.redirect_stdout(io.StringIO()):
-        return get_function_signature(block_graph)
+        return get_function_signature(block_graph, behavior)
 
 
 def _scope(enabled_registers: tuple[bytes, ...]) -> dict[bytes, bool]:

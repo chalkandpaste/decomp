@@ -226,10 +226,25 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
     def test_get_function_signature_uses_register_effect_model(self) -> None:
         self.assertEqual(
+            _import_prefix_violations(
+                Path("src/decomp/function_signatures.py"),
+                {"decomp.arch.arm_thumb"},
+            ),
+            [],
+        )
+        self.assertEqual(
             _function_call_violations(
                 Path("src/decomp/function_signatures.py"),
                 "get_function_signature",
                 {"crs"},
+            ),
+            [],
+        )
+        self.assertEqual(
+            _direct_name_call_violations(
+                Path("src/decomp/function_signatures.py"),
+                "_register_effect_for_instruction",
+                {"register_effect"},
             ),
             [],
         )
@@ -926,6 +941,20 @@ def _function_call_violations(path: Path, function_name: str, names: set[str]) -
             name = _call_name(child.func)
             if name in names:
                 violations.append(f"{path}:{child.lineno} {function_name} should not call {name}")
+    return violations
+
+
+def _direct_name_call_violations(path: Path, function_name: str, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Call):
+                continue
+            if isinstance(child.func, ast.Name) and child.func.id in names:
+                violations.append(f"{path}:{child.lineno} {function_name} should call through behavior")
     return violations
 
 

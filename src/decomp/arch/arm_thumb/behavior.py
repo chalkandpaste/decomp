@@ -17,6 +17,8 @@ from decomp.arch.arm_thumb.instruction_kinds import (
     is_stack_pop,
     is_unconditional_branch,
 )
+from decomp.arch.arm_thumb.register_effects import register_effect
+from decomp.arch.base import RegisterEffect
 from decomp.core.address import Address
 from decomp.core.instruction import Instruction
 
@@ -55,3 +57,6 @@ class ArmThumbArchitectureBehavior:
 
     def is_move_to_register(self, instruction: Instruction, register: str) -> bool:
         return is_move_to_register(instruction, register)
+
+    def register_effect(self, instruction: Instruction) -> RegisterEffect | None:
+        return register_effect(instruction)

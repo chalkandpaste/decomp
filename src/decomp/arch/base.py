@@ -17,6 +17,12 @@ class DisassemblerConfig:
     extra_args: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class RegisterEffect:
+    reads: tuple[bytes, ...] = ()
+    writes: tuple[bytes, ...] = ()
+
+
 class ArchitectureBackend(Protocol):
     id: str
     display_name: str
@@ -87,3 +93,6 @@ class ArchitectureBehavior(Protocol):
 
     def is_move_to_register(self, instruction: Instruction, register: str) -> bool:
         """Return whether an instruction loads/moves an immediate into a target register."""
+
+    def register_effect(self, instruction: Instruction) -> RegisterEffect | None:
+        """Return register reads/writes for signature and liveness analysis."""

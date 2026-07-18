@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from .analysis import collect_function_addresses
-from .arch.arm_thumb.register_effects import RegisterEffect, register_effect
+from .arch import ArchitectureBehavior, RegisterEffect, default_architecture_behavior
 from .core.cfg import ControlFlowGraph
 from .core.instruction import Instruction
 from .legacy_adapter import legacy_block_graph_to_cfg
@@ -136,17 +136,23 @@ def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, by
 
     return block_graph
 
-def collect_functions(block_graph: LegacyBlockGraph) -> list[int]:
+def collect_functions(
+    block_graph: LegacyBlockGraph,
+    behavior: ArchitectureBehavior | None = None,
+) -> list[int]:
     cfg = legacy_block_graph_to_cfg(block_graph)
-    return collect_function_addresses(cfg)
+    return collect_function_addresses(cfg, behavior)
 
-def get_function_signature(block_graph: LegacyBlockGraph) -> RegisterSignature:
+def get_function_signature(
+    block_graph: LegacyBlockGraph,
+    behavior: ArchitectureBehavior | None = None,
+) -> RegisterSignature:
     entry_address = block_graph.entry_address
     print('get_function_signature', hex(entry_address))
 
     cfg = legacy_block_graph_to_cfg(block_graph)
     loop_tracker = LoopTracker(cfg)
-    return _get_function_signature_from_cfg(cfg, loop_tracker)
+    return _get_function_signature_from_cfg(cfg, loop_tracker, behavior)
 
 
 def render_function_declaration(signature: RegisterSignature, address: int) -> FunctionDeclaration:
@@ -166,7 +172,9 @@ def render_function_declaration(signature: RegisterSignature, address: int) -> F
 def _get_function_signature_from_cfg(
     cfg: ControlFlowGraph,
     loop_tracker: LoopTracker,
+    behavior: ArchitectureBehavior | None = None,
 ) -> RegisterSignature:
+    architecture = behavior or default_architecture_behavior()
     entry_address = cfg.entry
     loops = {}
 
@@ -193,7 +201,7 @@ def _get_function_signature_from_cfg(
 
         insns = block.instructions
         for i in insns:
-            effect = _register_effect_for_instruction(i)
+            effect = _register_effect_for_instruction(i, architecture)
             if effect is not None:
                 _apply_forward_register_effect(scope, effect)
 
@@ -252,7 +260,7 @@ def _get_function_signature_from_cfg(
         insns.reverse()
 
         for i in insns:
-            effect = _register_effect_for_instruction(i)
+            effect = _register_effect_for_instruction(i, architecture)
             if effect is not None:
                 _apply_backward_register_effect(scope, effect)
 
@@ -278,8 +286,11 @@ def _get_function_signature_from_cfg(
     return RegisterSignature(return_scope=return_scope, argument_scope=arg_scope)
 
 
-def _register_effect_for_instruction(instruction: Instruction) -> RegisterEffect | None:
-    return register_effect(instruction)
+def _register_effect_for_instruction(
+    instruction: Instruction,
+    behavior: ArchitectureBehavior,
+) -> RegisterEffect | None:
+    return behavior.register_effect(instruction)
 
 
 def _register_scope(scope: RegisterScope | Mapping[bytes, bool]) -> RegisterScope:

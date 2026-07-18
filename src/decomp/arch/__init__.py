@@ -1,7 +1,7 @@
 """Architecture backends."""
 
 from .arm_thumb import ArmThumbArchitectureBehavior, ArmThumbBackend
-from .base import ArchitectureBackend, ArchitectureBehavior, DisassemblerConfig
+from .base import ArchitectureBackend, ArchitectureBehavior, DisassemblerConfig, RegisterEffect
 
 
 def default_architecture_backend() -> ArchitectureBackend:
@@ -18,6 +18,7 @@ __all__ = [
     "ArmThumbArchitectureBehavior",
     "ArmThumbBackend",
     "DisassemblerConfig",
+    "RegisterEffect",
     "default_architecture_backend",
     "default_architecture_behavior",
 ]
