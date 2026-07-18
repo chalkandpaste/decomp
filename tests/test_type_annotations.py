@@ -52,6 +52,13 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_graph_driven_modules_do_not_index_raw_block_maps(self) -> None:
+        violations = []
+        for path in (Path("src/decomp/function_signatures.py"), Path("src/decomp/structure.py")):
+            violations.extend(_raw_block_index_access(path))
+
+        self.assertEqual(violations, [])
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []
@@ -176,6 +183,17 @@ def _forbidden_defs(path: Path, names: set[str]) -> list[str]:
             continue
         if node.name in names:
             violations.append(f"{path}:{node.lineno} {node.name} belongs in a focused module")
+    return violations
+
+
+def _raw_block_index_access(path: Path) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Subscript):
+            continue
+        if _subscript_root_name(node.value) == "block_index":
+            violations.append(f"{path}:{node.lineno} use LegacyBlockGraph methods instead of block_index[...]")
     return violations
 
 

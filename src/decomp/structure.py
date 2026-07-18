@@ -39,7 +39,7 @@ class MetaBlockFinder(LoopTracker):
                 visited.append(block.address)
                 
                 if block.address not in reachable and (not len(children) == 0 or not self.branch_intersects(reachable, block.address)):
-                    # print("non-reachable", hex(block['loc']))
+                    # print("non-reachable", hex(block.address))
                     return False
 
                 for c in children:
@@ -61,7 +61,7 @@ class MetaBlockFinder(LoopTracker):
         if start_loc == end_loc:
             return end_loc
         # if start_loc == 134405328:
-            # print(block_index[134405328])
+            # print(self.graph.block_at(134405328))
             # raise Exception
 
         intersection = None
@@ -150,7 +150,6 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
     print('annotate_graph', hex(block_graph.start_block.address))
 
     start_loc = block_graph.start_block.address
-    block_index = block_graph.blocks
 
     mbf = MetaBlockFinder(block_graph)
 
@@ -188,8 +187,8 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
         # this is something other than an if, if/then, switch (i.e., while or function endings)
         preface = []
 
-        children_locs = block_index[start_loc].successors
-        children = [block_index[c] for c in children_locs]
+        children_locs = block_graph.successors(start_loc)
+        children = [block_graph.block_at(c) for c in children_locs]
 
         # print("pre-eating", hex(start_loc))
         while len(children) == 1 and len(children[0].predecessors) == 1 and children_locs[0] != end_loc:
@@ -197,8 +196,8 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
             start_loc = children_locs[0]
             # print("eating", hex(start_loc))
             seen_locs[start_loc] = True
-            children_locs = block_index[start_loc].successors
-            children = [block_index[c] for c in children_locs]
+            children_locs = block_graph.successors(start_loc)
+            children = [block_graph.block_at(c) for c in children_locs]
 
         preface.append(start_loc)
         seen_locs[start_loc] = True
@@ -405,7 +404,7 @@ def annotate_graph(block_graph: LegacyBlockGraph) -> MetaBlockGraph:
             raise Exception
 
     return MetaBlockGraph(
-            block_index=block_index,
+            block_index=block_graph.blocks,
             meta_blocks=meta_block_index,
             entry_address=meta_block_start,
             )

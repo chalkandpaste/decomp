@@ -17,8 +17,6 @@ skip_functions = [ 134469972, 134471256, 134469472, 134471424, 134472782, 134455
             # 0x8020244, 0x803af68, 0x8030144, 0x802ff6c, 0x802fd58, 0x803c23c,  ]
 
 def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, bytes]) -> LegacyBlockGraph:
-
-    block_index = block_graph.blocks
     start_block = block_graph.start_block
 
     search_locs = [start_block.address]
@@ -29,7 +27,8 @@ def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, by
         loc = search_locs.pop(0)
         seen[loc] = True
 
-        insns = block_index[loc].instructions
+        block = block_graph.block_at(loc)
+        insns = block.instructions
 
         new_insns = []
 
@@ -42,10 +41,9 @@ def add_function_sigs(block_graph: LegacyBlockGraph, function_sigs: dict[int, by
                     insn = [*insn, fs]
 
             new_insns.append(insn)
-        block_graph = block_graph.with_block(block_index[loc].with_instructions(tuple(new_insns)))
-        block_index = block_graph.blocks
+        block_graph = block_graph.with_block(block.with_instructions(tuple(new_insns)))
 
-        c_locs = block_index[loc].successors
+        c_locs = block_graph.successors(loc)
 
         for c in c_locs:
             if c not in seen and c not in search_locs:
@@ -59,7 +57,6 @@ def collect_functions(block_graph: LegacyBlockGraph) -> list[int]:
 
 def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegisterScope, LegacyRegisterScope]:
     start_block = block_graph.start_block
-    block_index = block_graph.blocks
     print('get_function_signature', hex(start_block.address))
 
     loop_tracker = LoopTracker(block_graph)
@@ -76,7 +73,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
 
     while len(search_locs) > 0:
         loc = search_locs.pop(0)
-        block = block_index[loc] 
+        block = block_graph.block_at(loc)
 
         if loc not in loops:
             if loop_tracker.can_loop(loc):
@@ -269,7 +266,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
 
         loc_scope[loc] = scope
 
-        c_locs = block.successors
+        c_locs = block_graph.successors(loc)
         
         if len(c_locs) == 0:
             if loc not in ends:
@@ -316,7 +313,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
     
     while len(search_locs) > 0:
         loc = search_locs.pop(0)
-        block = block_index[loc] 
+        block = block_graph.block_at(loc)
 
         if loc not in loops:
             if loop_tracker.can_loop(loc):
@@ -509,7 +506,7 @@ def get_function_signature(block_graph: LegacyBlockGraph) -> tuple[LegacyRegiste
 
         loc_scope[loc] = scope
 
-        p_locs = block.predecessors
+        p_locs = block_graph.predecessors(loc)
         
         for p in p_locs:
             if p not in loc_scope:
