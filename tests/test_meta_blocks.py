@@ -45,7 +45,10 @@ class MetaBlockTests(unittest.TestCase):
         )
 
         self.assertIs(graph.source_block_at(block.address), block)
-        self.assertEqual(graph.source_blocks, {block.address: block})
+        self.assertTrue(graph.has_source_block(block.address))
+        self.assertFalse(graph.has_source_block(0x08029999))
+        self.assertEqual(graph.source_addresses(), (block.address,))
+        self.assertEqual(graph.source_block_items(), ((block.address, block),))
 
     def test_meta_block_graph_storage_is_read_only(self) -> None:
         original_source = LegacyBlock(
@@ -83,6 +86,10 @@ class MetaBlockTests(unittest.TestCase):
 
         self.assertIs(graph.source_block_at(original_source.address), original_source)
         self.assertIs(graph.block_at(original_meta.address), original_meta)
+        self.assertTrue(graph.has_block(original_meta.address))
+        self.assertFalse(graph.has_block(0x08029999))
+        self.assertEqual(graph.addresses(), (original_meta.address,))
+        self.assertEqual(graph.block_items(), ((original_meta.address, original_meta),))
         with self.assertRaises(TypeError):
             graph.source_blocks[original_source.address] = replacement_source
         with self.assertRaises(TypeError):

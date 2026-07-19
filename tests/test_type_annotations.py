@@ -188,6 +188,15 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_production_code_uses_meta_block_graph_methods(self) -> None:
+        violations = []
+        for path in sorted(Path("src/decomp").rglob("*.py")):
+            if path == Path("src/decomp/meta_blocks.py"):
+                continue
+            violations.extend(_raw_meta_block_graph_storage_access(path))
+
+        self.assertEqual(violations, [])
+
     def test_meta_block_driven_modules_use_graph_methods(self) -> None:
         violations = []
         for path in (
@@ -1037,6 +1046,17 @@ def _legacy_meta_block_graph_block_index_access(path: Path) -> list[str]:
             continue
         if node.attr == "block_index":
             violations.append(f"{path}:{node.lineno} use MetaBlockGraph.source_blocks")
+    return violations
+
+
+def _raw_meta_block_graph_storage_access(path: Path) -> list[str]:
+    violations = []
+    storage_fields = {"meta_blocks", "source_blocks"}
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute) or node.attr not in storage_fields:
+            continue
+        violations.append(f"{path}:{node.lineno} use MetaBlockGraph methods instead of .{node.attr}")
     return violations
 
 

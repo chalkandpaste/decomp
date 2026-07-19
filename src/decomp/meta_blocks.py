@@ -114,6 +114,15 @@ class MetaBlockGraph:
     def block_at(self, address: Address) -> MetaBlock:
         return self.meta_blocks[address]
 
+    def has_block(self, address: Address) -> bool:
+        return address in self.meta_blocks
+
+    def addresses(self) -> tuple[Address, ...]:
+        return tuple(self.meta_blocks.keys())
+
+    def block_items(self) -> tuple[tuple[Address, MetaBlock], ...]:
+        return tuple(self.meta_blocks.items())
+
     def with_block(self, block: MetaBlock) -> "MetaBlockGraph":
         meta_blocks = dict(self.meta_blocks)
         meta_blocks[block.address] = block
@@ -125,6 +134,15 @@ class MetaBlockGraph:
 
     def source_block_at(self, address: Address) -> LegacyBlock:
         return self.source_blocks[address]
+
+    def has_source_block(self, address: Address) -> bool:
+        return address in self.source_blocks
+
+    def source_addresses(self) -> tuple[Address, ...]:
+        return tuple(self.source_blocks.keys())
+
+    def source_block_items(self) -> tuple[tuple[Address, LegacyBlock], ...]:
+        return tuple(self.source_blocks.items())
 
     def source_blocks_at(self, addresses: Sequence[Address]) -> tuple[LegacyBlock, ...]:
         return tuple(self.source_block_at(address) for address in addresses)
