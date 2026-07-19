@@ -150,6 +150,7 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         violations = []
         for path in (
             Path("src/decomp/block_graph.py"),
+            Path("src/decomp/legacy_adapter.py"),
             Path("src/decomp/structure.py"),
         ):
             violations.extend(_legacy_block_relationship_field_access(path))
@@ -214,6 +215,7 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         ):
             violations.extend(_attribute_access_violations(path, "meta_block_graph", {"meta_blocks"}))
             violations.extend(_attribute_access_violations(path, "graph", {"meta_blocks"}))
+            violations.extend(_meta_source_block_instruction_indexing(path))
 
         self.assertEqual(violations, [])
 
@@ -1089,6 +1091,27 @@ def _raw_meta_block_graph_storage_access(path: Path) -> list[str]:
             continue
         violations.append(f"{path}:{node.lineno} use MetaBlockGraph methods instead of .{node.attr}")
     return violations
+
+
+def _meta_source_block_instruction_indexing(path: Path) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute) or node.attr != "instructions":
+            continue
+        if _is_source_block_at_call(node.value):
+            violations.append(
+                f"{path}:{node.lineno} use LegacyBlock instruction helpers instead of source_block_at(...).instructions"
+            )
+    return violations
+
+
+def _is_source_block_at_call(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "source_block_at"
+    )
 
 
 def _unfrozen_dataclass_records(path: Path, names: set[str]) -> list[str]:

@@ -19,11 +19,12 @@ def legacy_block_graph_to_cfg(
 
     for address, block in legacy_blocks:
         block_edges = []
-        for index, child in enumerate(block.successors):
+        successors = block_graph.successors(address)
+        for index, child in enumerate(successors):
             edge = Edge(
                 source=address,
                 target=child,
-                kind=_edge_kind_for_child(index, len(block.successors)),
+                kind=_edge_kind_for_child(index, len(successors)),
             )
             block_edges.append(edge)
             incoming.setdefault(child, []).append(edge)

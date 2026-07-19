@@ -75,8 +75,8 @@ class FunctionSignatureTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(updated.block_at(entry.address).instructions[0][-1], b"; void func_0x8030000()")
-        self.assertEqual(updated.block_at(reachable.address).instructions[0][-1], b"; int func_0x8040000()")
+        self.assertEqual(updated.block_at(entry.address).first_instruction()[-1], b"; void func_0x8030000()")
+        self.assertEqual(updated.block_at(reachable.address).first_instruction()[-1], b"; int func_0x8040000()")
         self.assertEqual(updated.block_at(unreachable.address).instructions, unreachable.instructions)
         self.assertEqual(graph.block_at(entry.address).instructions, entry.instructions)
 
@@ -98,7 +98,7 @@ class FunctionSignatureTests(unittest.TestCase):
             behavior=IdentityAddressBehavior(),
         )
 
-        self.assertEqual(updated.block_at(entry.address).instructions[0][-1], b"; odd target behavior")
+        self.assertEqual(updated.block_at(entry.address).first_instruction()[-1], b"; odd target behavior")
 
     def test_detects_integer_return_register_write(self) -> None:
         graph = _single_block_graph(

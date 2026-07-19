@@ -20,6 +20,20 @@ class LegacyBlock:
     predecessors: tuple[int, ...]
     depth: int = 0
 
+    @property
+    def instruction_count(self) -> int:
+        return len(self.instructions)
+
+    def first_instruction(self) -> LegacyInstruction:
+        return self.instructions[0]
+
+    def last_instruction(self) -> LegacyInstruction:
+        return self.instructions[-1]
+
+    @property
+    def successor_count(self) -> int:
+        return len(self.successors)
+
     def with_instructions(self, instructions: tuple[LegacyInstruction, ...]) -> "LegacyBlock":
         return replace(self, instructions=instructions)
 

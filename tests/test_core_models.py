@@ -67,6 +67,22 @@ class CoreModelAdapterTests(unittest.TestCase):
         self.assertEqual(explicit_flow.successor_addresses(0x08020002), (0x08020020,))
         self.assertEqual(exit_flow.successor_addresses(0x08020002), ())
 
+    def test_legacy_block_exposes_common_instruction_and_edge_facts(self) -> None:
+        first = [b"0x8020000", b"2", b"0000", b"cmp", b"r0,", b"0"]
+        last = [b"0x8020002", b"2", b"0000", b"beq", b"0x8020008"]
+        block = LegacyBlock(
+            address=0x08020000,
+            end_address=0x08020004,
+            successors=(0x08020008, 0x08020004),
+            predecessors=(),
+            instructions=(first, last),
+        )
+
+        self.assertEqual(block.instruction_count, 2)
+        self.assertIs(block.first_instruction(), first)
+        self.assertIs(block.last_instruction(), last)
+        self.assertEqual(block.successor_count, 2)
+
     def test_converts_legacy_block_graph_to_typed_cfg(self) -> None:
         block = LegacyBlock(
             address=0x08020000,

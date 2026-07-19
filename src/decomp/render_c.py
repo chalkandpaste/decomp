@@ -250,7 +250,7 @@ def generate_func_cf_from_graph(meta_block_graph: MetaBlockGraph) -> bytes:
 
             block_out = b'\n'.join([print_block(block) for block in meta_block_graph.source_blocks_at(node.preface)])
 
-            switch_insn = meta_block_graph.source_block_at(node.preface[-1]).instructions[-1]
+            switch_insn = meta_block_graph.source_block_at(node.preface[-1]).last_instruction()
             switch_var = crs(operand_bytes(switch_insn, 1))
 
 
