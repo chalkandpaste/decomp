@@ -301,6 +301,12 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
     def test_loop_tracker_uses_named_exceptions(self) -> None:
         self.assertEqual(_generic_exception_raises(Path("src/decomp/loop_tracker.py")), [])
 
+    def test_loop_tracker_keeps_comments_and_debug_output_clean(self) -> None:
+        path = Path("src/decomp/loop_tracker.py")
+
+        self.assertEqual(_commented_out_code(path), [])
+        self.assertEqual(_direct_name_call_violations_in_module(path, {"print"}), [])
+
     def test_loop_tracker_loop_accessors_do_not_keep_dead_branches(self) -> None:
         self.assertEqual(
             _statements_after_return_in_functions(
@@ -1200,6 +1206,42 @@ def _generic_exception_raises(path: Path) -> list[str]:
             violations.append(f"{path}:{node.lineno} raise a named domain exception")
         elif isinstance(node.exc, ast.Call) and _call_name(node.exc.func) == "Exception":
             violations.append(f"{path}:{node.lineno} raise a named domain exception")
+    return violations
+
+
+def _commented_out_code(path: Path) -> list[str]:
+    code_prefixes = (
+        "additional_locs",
+        "elif ",
+        "else:",
+        "for ",
+        "if ",
+        "loop_locs",
+        "print(",
+        "raise ",
+        "return ",
+        "search_locs",
+        "while ",
+    )
+    violations = []
+    for lineno, line in enumerate(path.read_text().splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped.startswith("#"):
+            continue
+        comment = stripped[1:].strip()
+        if comment.startswith(code_prefixes):
+            violations.append(f"{path}:{lineno} remove stale commented-out code")
+    return violations
+
+
+def _direct_name_call_violations_in_module(path: Path, names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name) and node.func.id in names:
+            violations.append(f"{path}:{node.lineno} avoid direct {node.func.id} calls")
     return violations
 
 
