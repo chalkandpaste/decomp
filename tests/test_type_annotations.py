@@ -262,6 +262,28 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         )
         self.assertEqual(_tuple_return_violations(path, {"_detect_loop_inner"}), [])
 
+    def test_loop_tracker_detect_loop_delegates_refinement(self) -> None:
+        path = Path("src/decomp/loop_tracker.py")
+
+        self.assertEqual(
+            _function_call_count_violations(
+                path,
+                "detect_loop",
+                "_detect_loop_inner",
+                maximum_allowed=1,
+            ),
+            [],
+        )
+        self.assertEqual(
+            _function_call_count_violations(
+                path,
+                "_refine_loop_detection",
+                "_detect_loop_inner",
+                minimum_required=1,
+            ),
+            [],
+        )
+
     def test_loop_tracker_loop_accessors_do_not_keep_dead_branches(self) -> None:
         self.assertEqual(
             _statements_after_return_in_functions(
@@ -1297,6 +1319,32 @@ def _function_call_violations(path: Path, function_name: str, names: set[str]) -
             name = _call_name(child.func)
             if name in names:
                 violations.append(f"{path}:{child.lineno} {function_name} should not call {name}")
+    return violations
+
+
+def _function_call_count_violations(
+    path: Path,
+    function_name: str,
+    call_name: str,
+    minimum_required: int = 0,
+    maximum_allowed: int | None = None,
+) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    call_count = 0
+    function_lineno = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        function_lineno = node.lineno
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call) and _call_name(child.func) == call_name:
+                call_count += 1
+
+    if call_count < minimum_required:
+        violations.append(f"{path}:{function_lineno} {function_name} should call {call_name}")
+    if maximum_allowed is not None and call_count > maximum_allowed:
+        violations.append(f"{path}:{function_lineno} {function_name} should delegate repeated {call_name} calls")
     return violations
 
 

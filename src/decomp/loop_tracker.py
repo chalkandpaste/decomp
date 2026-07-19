@@ -27,6 +27,9 @@ class LoopDetection:
     entrance: int | None
     exit: int | None
 
+    def has_boundaries(self) -> bool:
+        return self.entrance is not None and self.exit is not None
+
     def to_loop_info(self) -> LoopInfo:
         return LoopInfo(
             start=self.entrance,
@@ -160,14 +163,23 @@ class LoopTracker:
             return False
        
         detection = self._detect_loop_inner(search_locs)
-        if detection.entrance is not None and detection.exit is not None:
-            dont_follow = (detection.entrance, detection.exit)
-            while len(detection.locations) > 0:
-                detection = self._detect_loop_inner(detection.locations, dont_follow)
-                if detection.entrance is not None and detection.exit is not None:
-                    dont_follow += (detection.entrance, detection.exit)
+        if detection.has_boundaries():
+            self._refine_loop_detection(detection)
 
         return True
+
+    def _refine_loop_detection(self, detection: LoopDetection) -> LoopDetection:
+        if not detection.has_boundaries():
+            return detection
+
+        assert detection.entrance is not None
+        assert detection.exit is not None
+        dont_follow = (detection.entrance, detection.exit)
+        while detection.locations:
+            detection = self._detect_loop_inner(detection.locations, dont_follow)
+            if detection.has_boundaries():
+                dont_follow += (detection.entrance, detection.exit)
+        return detection
     
     def _check_loop(self, start_loc: int, dont_follow: Iterable[int] | None = None) -> bool:
         if dont_follow is None:

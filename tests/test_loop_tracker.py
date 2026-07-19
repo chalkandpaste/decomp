@@ -34,6 +34,27 @@ class LoopTrackerTests(unittest.TestCase):
             ),
         )
 
+    def test_loop_detection_knows_when_boundaries_are_complete(self) -> None:
+        bounded = LoopDetection(
+            locations=(0x08020002, 0x08020004),
+            entrance=0x08020002,
+            exit=0x08020004,
+        )
+        missing_entrance = LoopDetection(
+            locations=(0x08020002, 0x08020004),
+            entrance=None,
+            exit=0x08020004,
+        )
+        missing_exit = LoopDetection(
+            locations=(0x08020002, 0x08020004),
+            entrance=0x08020002,
+            exit=None,
+        )
+
+        self.assertTrue(bounded.has_boundaries())
+        self.assertFalse(missing_entrance.has_boundaries())
+        self.assertFalse(missing_exit.has_boundaries())
+
     def test_loop_tracker_uses_block_graph_model(self) -> None:
         first = _legacy_block(0x08020000, (0x08020002,), (0x08020002,))
         second = _legacy_block(0x08020002, (0x08020000,), (0x08020000,))
