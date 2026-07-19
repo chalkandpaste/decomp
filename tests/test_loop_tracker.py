@@ -4,7 +4,7 @@ import unittest
 
 from decomp.core.cfg import BasicBlock, ControlFlowGraph, Edge
 from decomp.legacy_types import LegacyBlock, LegacyBlockGraph
-from decomp.loop_tracker import LoopDetection, LoopInfo, LoopTracker
+from decomp.loop_tracker import InconsistentLoopBoundaryError, LoopDetection, LoopInfo, LoopTracker
 
 
 def _legacy_block(address: int, successors: tuple[int, ...], predecessors: tuple[int, ...]) -> LegacyBlock:
@@ -54,6 +54,23 @@ class LoopTrackerTests(unittest.TestCase):
         self.assertTrue(bounded.has_boundaries())
         self.assertFalse(missing_entrance.has_boundaries())
         self.assertFalse(missing_exit.has_boundaries())
+        self.assertFalse(bounded.has_partial_boundaries())
+        self.assertTrue(missing_entrance.has_partial_boundaries())
+        self.assertTrue(missing_exit.has_partial_boundaries())
+
+    def test_inconsistent_loop_boundary_error_keeps_detection_context(self) -> None:
+        detection = LoopDetection(
+            locations=(0x08020002, 0x08020004),
+            entrance=0x08020002,
+            exit=None,
+        )
+
+        error = InconsistentLoopBoundaryError(detection)
+
+        self.assertIs(error.detection, detection)
+        self.assertIn("entrance=0x8020002", str(error))
+        self.assertIn("exit=None", str(error))
+        self.assertIn("locations=[0x8020002, 0x8020004]", str(error))
 
     def test_loop_tracker_uses_block_graph_model(self) -> None:
         first = _legacy_block(0x08020000, (0x08020002,), (0x08020002,))

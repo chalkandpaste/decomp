@@ -30,11 +30,25 @@ class LoopDetection:
     def has_boundaries(self) -> bool:
         return self.entrance is not None and self.exit is not None
 
+    def has_partial_boundaries(self) -> bool:
+        return (self.entrance is None) != (self.exit is None)
+
     def to_loop_info(self) -> LoopInfo:
         return LoopInfo(
             start=self.entrance,
             end=self.exit,
             locations=self.locations,
+        )
+
+
+class InconsistentLoopBoundaryError(Exception):
+    def __init__(self, detection: LoopDetection) -> None:
+        self.detection = detection
+        super().__init__(
+            "inconsistent loop boundaries: "
+            f"entrance={_format_optional_address(detection.entrance)}, "
+            f"exit={_format_optional_address(detection.exit)}, "
+            f"locations={_format_addresses(detection.locations)}"
         )
 
 
@@ -299,19 +313,24 @@ class LoopTracker:
         # print("exit_loc", hex(exit_loc) if exit_loc is not None else None)
         # print("loop_locs", [hex(l) for l in loop_locs])
 
-        if (entrance_loc is not None and exit_loc is None) or (entrance_loc is None and exit_loc is not None):
-            print("entrance_loc", hex(entrance_loc) if entrance_loc is not None else None)
-            print("exit_loc", hex(exit_loc) if exit_loc is not None else None)
-            print("loop_locs", [hex(l) for l in loop_locs])
-            raise Exception
-
         detection = LoopDetection(
             locations=tuple(loop_locs),
             entrance=entrance_loc,
             exit=exit_loc,
         )
+        if detection.has_partial_boundaries():
+            raise InconsistentLoopBoundaryError(detection)
+
         loop = detection.to_loop_info()
         for loc in loop_locs:
             self._loc_to_loop[loc] = loop
 
         return detection
+
+
+def _format_optional_address(address: int | None) -> str:
+    return "None" if address is None else hex(address)
+
+
+def _format_addresses(addresses: Iterable[int]) -> str:
+    return "[" + ", ".join(hex(address) for address in addresses) + "]"

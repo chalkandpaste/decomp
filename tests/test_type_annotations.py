@@ -298,6 +298,9 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
         )
         self.assertEqual(_method_call_violations(path, "branch_intersects", {"popleft"}), [])
 
+    def test_loop_tracker_uses_named_exceptions(self) -> None:
+        self.assertEqual(_generic_exception_raises(Path("src/decomp/loop_tracker.py")), [])
+
     def test_loop_tracker_loop_accessors_do_not_keep_dead_branches(self) -> None:
         self.assertEqual(
             _statements_after_return_in_functions(
@@ -1184,6 +1187,19 @@ def _external_attribute_access(path: Path, names: set[str]) -> list[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Attribute) and node.attr in names:
             violations.append(f"{path}:{node.lineno} use public model accessors instead of {node.attr}")
+    return violations
+
+
+def _generic_exception_raises(path: Path) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Raise):
+            continue
+        if isinstance(node.exc, ast.Name) and node.exc.id == "Exception":
+            violations.append(f"{path}:{node.lineno} raise a named domain exception")
+        elif isinstance(node.exc, ast.Call) and _call_name(node.exc.func) == "Exception":
+            violations.append(f"{path}:{node.lineno} raise a named domain exception")
     return violations
 
 
