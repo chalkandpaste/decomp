@@ -108,11 +108,14 @@ class CoreModelAdapterTests(unittest.TestCase):
 
         self.assertEqual(cfg.entry, 0x08020000)
         self.assertEqual(cfg.block_starts(), (0x08020000, 0x08020004, 0x08020008))
-        self.assertEqual(cfg.block_at(0x08020000).outgoing[0].kind, EdgeKind.TRUE_BRANCH)
-        self.assertEqual(cfg.block_at(0x08020000).outgoing[1].kind, EdgeKind.FALSE_BRANCH)
+        self.assertEqual(cfg.outgoing_edges(0x08020000)[0].kind, EdgeKind.TRUE_BRANCH)
+        self.assertEqual(cfg.outgoing_edges(0x08020000)[1].kind, EdgeKind.FALSE_BRANCH)
         self.assertEqual(cfg.block_at(0x08020000).instructions[1].flow.kind, FlowKind.CONDITIONAL_BRANCH)
-        self.assertEqual(cfg.block_at(0x08020004).incoming[0].source, 0x08020000)
+        self.assertEqual(cfg.incoming_edges(0x08020004)[0].source, 0x08020000)
         self.assertEqual(cfg.block_at(0x08020000).address, 0x08020000)
+        self.assertEqual(cfg.block_at(0x08020000).instruction_count, 2)
+        self.assertEqual(cfg.block_at(0x08020000).successor_addresses(), (0x08020008, 0x08020004))
+        self.assertEqual(cfg.block_at(0x08020004).predecessor_addresses(), (0x08020000,))
         self.assertEqual(cfg.successors(0x08020000), (0x08020008, 0x08020004))
         self.assertEqual(cfg.predecessors(0x08020004), (0x08020000,))
 

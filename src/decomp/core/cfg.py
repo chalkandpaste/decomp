@@ -36,11 +36,27 @@ class BasicBlock:
     def range(self) -> AddressRange:
         return AddressRange(self.address, self.end)
 
+    @property
+    def instruction_count(self) -> int:
+        return len(self.instructions)
+
+    def successor_addresses(self) -> tuple[Address, ...]:
+        return tuple(edge.target for edge in self.outgoing)
+
+    def predecessor_addresses(self) -> tuple[Address, ...]:
+        return tuple(edge.source for edge in self.incoming)
+
+    def successor_edges(self) -> tuple[Edge, ...]:
+        return self.outgoing
+
+    def predecessor_edges(self) -> tuple[Edge, ...]:
+        return self.incoming
+
     def to_json(self) -> dict[str, object]:
         return {
             "address": hex(self.address),
             "end": hex(self.end),
-            "instruction_count": len(self.instructions),
+            "instruction_count": self.instruction_count,
             "outgoing": [edge.to_json() for edge in self.outgoing],
             "incoming": [edge.to_json() for edge in self.incoming],
             "instructions": [instruction.to_json() for instruction in self.instructions],
@@ -73,10 +89,16 @@ class ControlFlowGraph:
         return ControlFlowGraph(entry=self.entry, blocks=blocks)
 
     def successors(self, address: Address) -> tuple[Address, ...]:
-        return tuple(edge.target for edge in self.block_at(address).outgoing)
+        return self.block_at(address).successor_addresses()
 
     def predecessors(self, address: Address) -> tuple[Address, ...]:
-        return tuple(edge.source for edge in self.block_at(address).incoming)
+        return self.block_at(address).predecessor_addresses()
+
+    def outgoing_edges(self, address: Address) -> tuple[Edge, ...]:
+        return self.block_at(address).successor_edges()
+
+    def incoming_edges(self, address: Address) -> tuple[Edge, ...]:
+        return self.block_at(address).predecessor_edges()
 
     def reachable_order(
         self,
@@ -110,7 +132,7 @@ class ControlFlowGraph:
         return tuple(
             edge
             for _address, block in self.block_items()
-            for edge in block.outgoing
+            for edge in block.successor_edges()
         )
 
     def to_json(self) -> dict[str, object]:

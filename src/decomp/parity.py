@@ -219,9 +219,9 @@ def _block_fingerprints(cfg: ControlFlowGraph) -> tuple[BlockFingerprint, ...]:
         BlockFingerprint(
             address=block.address,
             end=block.end,
-            instruction_count=len(block.instructions),
-            outgoing=tuple(edge.target for edge in block.outgoing),
-            incoming=tuple(edge.source for edge in block.incoming),
+            instruction_count=block.instruction_count,
+            outgoing=block.successor_addresses(),
+            incoming=block.predecessor_addresses(),
         )
         for block in (cfg.block_at(address) for address in cfg.block_starts())
     )

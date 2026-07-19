@@ -193,7 +193,7 @@ class BlockGraphTests(unittest.TestCase):
         )
 
         self.assertEqual(cfg.block_at(0x08020004).end, 0x08020006)
-        self.assertEqual([edge.target for edge in cfg.block_at(0x08020004).outgoing], [0x08020006])
+        self.assertEqual(cfg.successors(0x08020004), (0x08020006,))
 
 
 if __name__ == "__main__":

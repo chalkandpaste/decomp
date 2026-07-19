@@ -95,7 +95,7 @@ def cfg_to_legacy_block_graph(cfg: ControlFlowGraph) -> LegacyBlockGraph:
             address=block.address,
             end_address=block.end,
             instructions=tuple(_legacy_tokens(instruction) for instruction in block.instructions),
-            successors=tuple(edge.target for edge in block.outgoing),
+            successors=block.successor_addresses(),
             predecessors=parents.get(address, ()),
             depth=block.depth,
         )
@@ -217,7 +217,7 @@ def _attach_incoming_edges(cfg: ControlFlowGraph) -> ControlFlowGraph:
     incoming: dict[int, list[Edge]] = {address: [] for address in cfg.block_starts()}
 
     for source in _reachable_block_order(cfg):
-        for edge in cfg.block_at(source).outgoing:
+        for edge in cfg.outgoing_edges(source):
             if edge.target in incoming and edge.source not in [existing.source for existing in incoming[edge.target]]:
                 incoming[edge.target].append(edge)
 
@@ -230,9 +230,9 @@ def _attach_incoming_edges(cfg: ControlFlowGraph) -> ControlFlowGraph:
 def _legacy_parent_index(cfg: ControlFlowGraph) -> dict[int, tuple[int, ...]]:
     parents: dict[int, list[int]] = {address: [] for address in cfg.block_starts()}
     for source in _reachable_block_order(cfg):
-        for edge in cfg.block_at(source).outgoing:
-            if edge.target in parents and edge.source not in parents[edge.target]:
-                parents[edge.target].append(edge.source)
+        for target in cfg.successors(source):
+            if target in parents and source not in parents[target]:
+                parents[target].append(source)
     return {
         address: tuple(parent_addresses)
         for address, parent_addresses in parents.items()
@@ -251,9 +251,9 @@ def _reachable_block_order(cfg: ControlFlowGraph) -> list[int]:
         tally[address] = False
         order.append(address)
 
-        for edge in cfg.block_at(address).outgoing:
-            if edge.target in tally and tally[edge.target]:
-                retrace_nodes.append(edge.target)
+        for target in cfg.successors(address):
+            if target in tally and tally[target]:
+                retrace_nodes.append(target)
 
     return order
 

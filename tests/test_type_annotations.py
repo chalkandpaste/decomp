@@ -172,6 +172,15 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_production_cfg_clients_use_edge_accessors(self) -> None:
+        violations = []
+        for path in sorted(Path("src/decomp").rglob("*.py")):
+            if path == Path("src/decomp/core/cfg.py"):
+                continue
+            violations.extend(_raw_cfg_block_edge_access(path))
+
+        self.assertEqual(violations, [])
+
     def test_meta_block_graph_construction_uses_source_blocks_name(self) -> None:
         violations = []
         for root in (Path("src/decomp"), Path("tests")):
@@ -962,6 +971,28 @@ def _legacy_block_relationship_field_access(path: Path) -> list[str]:
         if _attribute_root_name(node.value) in block_names:
             violations.append(f"{path}:{node.lineno} use graph.{node.attr}(address)")
     return violations
+
+
+def _raw_cfg_block_edge_access(path: Path) -> list[str]:
+    edge_fields = {"incoming", "outgoing"}
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute) or node.attr not in edge_fields:
+            continue
+        if _is_block_at_call(node.value):
+            violations.append(
+                f"{path}:{node.lineno} use ControlFlowGraph edge methods instead of block_at(...).{node.attr}"
+            )
+    return violations
+
+
+def _is_block_at_call(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "block_at"
+    )
 
 
 def _attribute_access_violations(path: Path, root_name: str, attribute_names: set[str]) -> list[str]:
