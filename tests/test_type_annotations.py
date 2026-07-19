@@ -284,6 +284,20 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
             [],
         )
 
+    def test_loop_tracker_branch_intersection_uses_traversal_helper(self) -> None:
+        path = Path("src/decomp/loop_tracker.py")
+
+        self.assertEqual(
+            _function_call_count_violations(
+                path,
+                "branch_intersects",
+                "_walk_until_reachable",
+                minimum_required=2,
+            ),
+            [],
+        )
+        self.assertEqual(_method_call_violations(path, "branch_intersects", {"popleft"}), [])
+
     def test_loop_tracker_loop_accessors_do_not_keep_dead_branches(self) -> None:
         self.assertEqual(
             _statements_after_return_in_functions(
@@ -1345,6 +1359,20 @@ def _function_call_count_violations(
         violations.append(f"{path}:{function_lineno} {function_name} should call {call_name}")
     if maximum_allowed is not None and call_count > maximum_allowed:
         violations.append(f"{path}:{function_lineno} {function_name} should delegate repeated {call_name} calls")
+    return violations
+
+
+def _method_call_violations(path: Path, function_name: str, method_names: set[str]) -> list[str]:
+    violations = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != function_name:
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Call):
+                continue
+            if isinstance(child.func, ast.Attribute) and child.func.attr in method_names:
+                violations.append(f"{path}:{child.lineno} {function_name} should use a helper for {child.func.attr}")
     return violations
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -103,41 +103,53 @@ class LoopTracker:
         # print('branch_intersects', [hex(r) for r in reachable], hex(loc))
 
         reachable_locs = set(reachable)
-        search_locs: deque[int] = deque([loc])
-
         branch_locs: list[int] = []
-
         seen: set[int] = set()
+
+        if self._walk_until_reachable(
+            start_locs=(loc,),
+            reachable_locs=reachable_locs,
+            seen=seen,
+            next_addresses=self.graph.successors,
+            discovered_locs=branch_locs,
+        ):
+            return True
+
+        # print('branch_locs', [hex(b) for b in branch_locs])
+
+        for b in branch_locs:
+            if self._walk_until_reachable(
+                start_locs=(b,),
+                reachable_locs=reachable_locs,
+                seen=seen,
+                next_addresses=self.graph.predecessors,
+            ):
+                return True
+
+        return False
+
+    def _walk_until_reachable(
+        self,
+        start_locs: Iterable[int],
+        reachable_locs: set[int],
+        seen: set[int],
+        next_addresses: Callable[[int], tuple[int, ...]],
+        discovered_locs: list[int] | None = None,
+    ) -> bool:
+        search_locs: deque[int] = deque(start_locs)
 
         while search_locs:
             loc = search_locs.popleft()
-
             seen.add(loc)
 
             if loc in reachable_locs:
                 return True
 
-            for c in self.graph.successors(loc):
-                if c not in seen and c not in search_locs:
-                    search_locs.append(c)
-                    branch_locs.append(c)
-
-        # print('branch_locs', [hex(b) for b in branch_locs])
-
-        for b in branch_locs:
-            search_locs = deque([b])
-
-            while search_locs:
-                loc = search_locs.popleft()
-                seen.add(loc)
-
-                if loc in reachable_locs:
-                    return True
-
-                p_locs = self.graph.predecessors(loc)
-                for p in p_locs:
-                    if p not in seen and p not in search_locs:
-                        search_locs.append(p)
+            for next_loc in next_addresses(loc):
+                if next_loc not in seen and next_loc not in search_locs:
+                    search_locs.append(next_loc)
+                    if discovered_locs is not None:
+                        discovered_locs.append(next_loc)
 
         return False
     

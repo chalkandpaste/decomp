@@ -137,6 +137,36 @@ class LoopTrackerTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertTrue(tracker.can_loop(first.address))
 
+    def test_branch_intersects_reachable_forward_branch(self) -> None:
+        start = _legacy_block(0x08020000, (0x08020002,), ())
+        reachable = _legacy_block(0x08020002, (), (start.address,))
+        graph = LegacyBlockGraph(
+            blocks={
+                start.address: start,
+                reachable.address: reachable,
+            },
+            entry_address=start.address,
+        )
+        tracker = LoopTracker(graph)
+
+        self.assertTrue(tracker.branch_intersects({reachable.address}, start.address))
+
+    def test_branch_intersects_reachable_predecessor_branch(self) -> None:
+        start = _legacy_block(0x08020000, (0x08020002,), ())
+        branch = _legacy_block(0x08020002, (), (start.address, 0x08020004))
+        reachable = _legacy_block(0x08020004, (), ())
+        graph = LegacyBlockGraph(
+            blocks={
+                start.address: start,
+                branch.address: branch,
+                reachable.address: reachable,
+            },
+            entry_address=start.address,
+        )
+        tracker = LoopTracker(graph)
+
+        self.assertTrue(tracker.branch_intersects({reachable.address}, start.address))
+
     def test_loop_tracker_tracks_non_loop_locations_with_set_membership(self) -> None:
         block = _legacy_block(0x08020000, (), ())
         graph = LegacyBlockGraph(
