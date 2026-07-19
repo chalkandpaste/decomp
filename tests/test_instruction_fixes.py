@@ -122,6 +122,14 @@ class ArmThumbBackendDecodeTests(unittest.TestCase):
 
 
 class ConvertInstructionTests(unittest.TestCase):
+    def test_instruction_token_view_names_mnemonic_and_operands(self) -> None:
+        view = convert_c.InstructionTokenView.from_tokens([b"add", b"r0", b"r1", b"2"])
+
+        self.assertEqual(view.mnemonic, b"add")
+        self.assertEqual(view.operand_count, 3)
+        self.assertEqual(view.operand(0), b"r0")
+        self.assertEqual(view.trailing_operands(2), (b"r1", b"2"))
+
     def test_convert_instruction_dispatches_via_named_mnemonic_accessor(self) -> None:
         self.assertEqual(convert_c.convert_instruction([b"mov", b"r0", b"1"]), b"r0 = 1")
 

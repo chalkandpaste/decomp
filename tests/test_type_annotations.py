@@ -682,6 +682,37 @@ class TypeAnnotationCoverageTests(unittest.TestCase):
 
         self.assertEqual(violations, [])
 
+    def test_convert_c_renderers_do_not_index_instruction_tokens_directly(self) -> None:
+        violations = []
+        renderer_names = {
+            "bits",
+            "cast",
+            "func_call",
+            "load",
+            "load_d",
+            "shift_left",
+            "shift_right",
+            "smull",
+            "store",
+            "store_d",
+        }
+        for function_name in renderer_names:
+            violations.extend(
+                _raw_numeric_subscripts_in_function(
+                    Path("src/decomp/convert_c.py"),
+                    function_name,
+                    set(range(14)),
+                )
+            )
+            violations.extend(
+                _negative_subscripts_in_function(
+                    Path("src/decomp/convert_c.py"),
+                    function_name,
+                )
+            )
+
+        self.assertEqual(violations, [])
+
 
 def _missing_annotations(path: Path) -> list[str]:
     missing = []

@@ -1,22 +1,53 @@
 import argparse
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import TypeAlias
 
 from . import instructions as ns
 from .legacy_types import LegacyConvertedSection, LegacyLineSection
 
-InstructionTokens: TypeAlias = list[bytes]
+InstructionTokens: TypeAlias = Sequence[bytes]
+
+
+@dataclass(frozen=True)
+class InstructionTokenView:
+    tokens: tuple[bytes, ...]
+
+    @classmethod
+    def from_tokens(cls, tokens: InstructionTokens) -> "InstructionTokenView":
+        return cls(tuple(tokens))
+
+    @property
+    def mnemonic(self) -> bytes:
+        return self.token(0)
+
+    @property
+    def operand_count(self) -> int:
+        return len(self.tokens) - 1
+
+    def token(self, index: int) -> bytes:
+        return self.tokens[index]
+
+    def operand(self, index: int) -> bytes:
+        return self.token(index + 1)
+
+    def trailing_operands(self, count: int) -> tuple[bytes, ...]:
+        return tuple(self.tokens[-count:])
+
+    def __len__(self) -> int:
+        return len(self.tokens)
 
 
 def instruction_mnemonic(instruction: InstructionTokens) -> bytes:
-    return instruction[0]
+    return InstructionTokenView.from_tokens(instruction).mnemonic
 
 
 def instruction_operand(instruction: InstructionTokens, index: int) -> bytes:
-    return instruction[index + 1]
+    return InstructionTokenView.from_tokens(instruction).operand(index)
 
 
 def last_instruction_operands(instruction: InstructionTokens, count: int) -> tuple[bytes, ...]:
-    return tuple(instruction[-count:])
+    return InstructionTokenView.from_tokens(instruction).trailing_operands(count)
 
 
 def map_sections(sections: list[LegacyLineSection]) -> list[LegacyConvertedSection]:
@@ -170,7 +201,16 @@ def mul(i: InstructionTokens) -> bytes:
     return instruction_operand(i, 0) + b' = ' + left + b' * ' + right
 
 def smull(i: InstructionTokens) -> bytes:
-    return i[2] + b' = ' + i[3] + b' * ' + i[4] + b' & 0xFFFFFFFF00000000 >> 32;\n' + i[1] + b' = (unsigned int) (' + i[3] + b' * ' + i[4] + b' & 0xFFFFFFFF )'
+    instruction = InstructionTokenView.from_tokens(i)
+    high = instruction.operand(1)
+    low = instruction.operand(0)
+    left = instruction.operand(2)
+    right = instruction.operand(3)
+    return (
+        high + b' = ' + left + b' * ' + right +
+        b' & 0xFFFFFFFF00000000 >> 32;\n' +
+        low + b' = (unsigned int) (' + left + b' * ' + right + b' & 0xFFFFFFFF )'
+    )
 
 def vmlas(i: InstructionTokens) -> bytes:
     destination = instruction_operand(i, 0)
@@ -186,28 +226,32 @@ def orr(i: InstructionTokens) -> bytes:
     return binop(b' | ', i)
 
 def bits(i: InstructionTokens) -> bytes:
-    if i[0] == b'ubfx':
-        lsb = int(i[3])
-        width = int(i[4])
+    instruction = InstructionTokenView.from_tokens(i)
+    destination = instruction.operand(0)
+    mnemonic = instruction.mnemonic
+    if mnemonic == b'ubfx':
+        source = instruction.operand(1)
+        lsb = int(instruction.operand(2))
+        width = int(instruction.operand(3))
         val = 0
         for j in range(lsb, width + lsb):
             val += 2**j
-        return i[1] + b' = ' + i[2] + b' & ' + bytes(hex(val), 'utf-8')
-    elif i[0] == b'bfc' and len(i) == 4:
-        lsb = int(i[2])
-        width = int(i[3])
+        return destination + b' = ' + source + b' & ' + bytes(hex(val), 'utf-8')
+    elif mnemonic == b'bfc' and len(i) == 4:
+        lsb = int(instruction.operand(1))
+        width = int(instruction.operand(2))
         val = 0
         for j in range(lsb, width + lsb):
             val += 2**j
-        return i[1] + b' = ' + i[1] + b' & ~ ' + bytes(hex(val), 'utf-8')
-    elif i[0] == b'bfi' and len(i) == 5:
-        reg = i[2]
-        lsb = int(i[3])
-        width = int(i[4])
+        return destination + b' = ' + destination + b' & ~ ' + bytes(hex(val), 'utf-8')
+    elif mnemonic == b'bfi' and len(i) == 5:
+        source = instruction.operand(1)
+        lsb = int(instruction.operand(2))
+        width = int(instruction.operand(3))
         val = 0
         for j in range(lsb, width + lsb):
             val += 2**j
-        return i[1] + b' = ' + i[2] + b' | ' + bytes(hex(val), 'utf-8')
+        return destination + b' = ' + source + b' | ' + bytes(hex(val), 'utf-8')
     else:
         print(i)
         raise Exception
@@ -220,120 +264,195 @@ def sxtab(i: InstructionTokens) -> bytes:
     return destination + b' = ' + addend + b' + (int) (char) ' + extended
 
 def shift_left(i: InstructionTokens) -> bytes:
-    if len(i) == 3:
-        return i[1] + b' = ' + i[1] + b' << ' + i[2]
-    elif len(i) == 4:
-        return i[1] + b' = ' + i[-2] + b' << ' + i[-1] 
+    instruction = InstructionTokenView.from_tokens(i)
+    if len(instruction) == 3:
+        destination = instruction.operand(0)
+        return destination + b' = ' + destination + b' << ' + instruction.operand(1)
+    elif len(instruction) == 4:
+        left, right = instruction.trailing_operands(2)
+        return instruction.operand(0) + b' = ' + left + b' << ' + right
     else:
         print(i)
         raise Exception
 
 def shift_right(i: InstructionTokens) -> bytes:
-    if len(i) == 3:
-        return i[1] + b' = ' + i[1] + b' >> ' + i[2]
-    elif len(i) == 4:
-        return i[1] + b' = ' + i[2] + b' >> ' + i[3]
+    instruction = InstructionTokenView.from_tokens(i)
+    if len(instruction) == 3:
+        destination = instruction.operand(0)
+        return destination + b' = ' + destination + b' >> ' + instruction.operand(1)
+    elif len(instruction) == 4:
+        return (
+            instruction.operand(0) +
+            b' = ' +
+            instruction.operand(1) +
+            b' >> ' +
+            instruction.operand(2)
+        )
     else:
         print(i)
         raise Exception
 
 def cast(i: InstructionTokens) -> bytes:
-    if i[0] in ns.cast_to_float:
-        return i[1] + b' = (float) ' + i[2]
-    elif i[0] in ns.cast_to_int:
-        return i[1] + b' = (int) ' + i[2]
-    elif i[0] in ns.cast_to_uint:
-        return i[1] + b' = (unsigned int) ' + i[2] 
+    instruction = InstructionTokenView.from_tokens(i)
+    destination = instruction.operand(0)
+    source = instruction.operand(1)
+    mnemonic = instruction.mnemonic
+    if mnemonic in ns.cast_to_float:
+        return destination + b' = (float) ' + source
+    elif mnemonic in ns.cast_to_int:
+        return destination + b' = (int) ' + source
+    elif mnemonic in ns.cast_to_uint:
+        return destination + b' = (unsigned int) ' + source
     else:
         print(i)
         raise Exception
 
 def load(i: InstructionTokens) -> bytes:
+    instruction = InstructionTokenView.from_tokens(i)
 
-    if len(i) < 4:
-        addr = i[2]
-    elif len(i) < 5:
-        if i[3].startswith(b'"'):
-            addr = i[2]
+    if len(instruction) < 4:
+        addr = instruction.operand(1)
+    elif len(instruction) < 5:
+        if instruction.operand(2).startswith(b'"'):
+            addr = instruction.operand(1)
         else:
-            addr = i[2] + b' + ' + i[3]
+            addr = instruction.operand(1) + b' + ' + instruction.operand(2)
     else:
-        addr = i[2] + b' + ' + i[3] + b' << ' + i[5]
+        addr = (
+            instruction.operand(1) +
+            b' + ' +
+            instruction.operand(2) +
+            b' << ' +
+            instruction.operand(4)
+        )
 
-    return i[1] + b' = *( ' + addr + b' )'
+    return instruction.operand(0) + b' = *( ' + addr + b' )'
 
 def load_d(i: InstructionTokens) -> bytes:
+    instruction = InstructionTokenView.from_tokens(i)
 
-    if len(i) == 4:
-        addr = i[3]
-    elif len(i) == 5:
-        if i[3].startswith(b'"'):
-            addr = i[3]
+    if len(instruction) == 4:
+        addr = instruction.operand(2)
+    elif len(instruction) == 5:
+        if instruction.operand(2).startswith(b'"'):
+            addr = instruction.operand(2)
         else:
-            addr = i[3] + b' + ' + i[4]
-    elif len(i) == 7:
-        addr = i[3] + b' + ' + i[4] + b' << ' + i[6]
+            addr = instruction.operand(2) + b' + ' + instruction.operand(3)
+    elif len(instruction) == 7:
+        addr = (
+            instruction.operand(2) +
+            b' + ' +
+            instruction.operand(3) +
+            b' << ' +
+            instruction.operand(5)
+        )
     else:
         print(i)
         raise Exception
     
-    return i[1] + b' = *( ' + addr + b' );\n' + i[2] + b' = *( ' + addr + b' + 4 )'
+    return (
+        instruction.operand(0) +
+        b' = *( ' +
+        addr +
+        b' );\n' +
+        instruction.operand(1) +
+        b' = *( ' +
+        addr +
+        b' + 4 )'
+    )
 
 def store(i: InstructionTokens) -> bytes:
-    if len(i) == 3:
-        return b'*( ' + i[2] + b' ) = ' + i[1]
-    elif len(i) == 4:
-        return b'*( ' + i[2] + b' + ' + i[3] + b' ) = ' + i[1]
-    elif len(i) == 6 and i[4] == b'lsl':
-        return b'*( ' + i[2] + b' + ' + i[3] + b' << ' + i[4] + b' ) = ' + i[1]
+    instruction = InstructionTokenView.from_tokens(i)
+    if len(instruction) == 3:
+        return b'*( ' + instruction.operand(1) + b' ) = ' + instruction.operand(0)
+    elif len(instruction) == 4:
+        return (
+            b'*( ' +
+            instruction.operand(1) +
+            b' + ' +
+            instruction.operand(2) +
+            b' ) = ' +
+            instruction.operand(0)
+        )
+    elif len(instruction) == 6 and instruction.operand(3) == b'lsl':
+        return (
+            b'*( ' +
+            instruction.operand(1) +
+            b' + ' +
+            instruction.operand(2) +
+            b' << ' +
+            instruction.operand(3) +
+            b' ) = ' +
+            instruction.operand(0)
+        )
     else:
         print(i)
         raise Exception
 
 def store_d(i: InstructionTokens) -> bytes:
-    if len(i) == 4:
-        out1 = b'*( ' + i[3] + b') = ' + i[1]
-        out2 = b'*( ' + i[3] + b' + 4) = ' + i[2]
-    elif len(i) == 5:
-        out1 = b'*( ' + i[3] + b' + ' + i[4] + b' ) = ' + i[1]
-        out2 = b'*( ' + i[3] + b' + ' + i[4] + b' + 4 ) = ' + i[2]
+    instruction = InstructionTokenView.from_tokens(i)
+    if len(instruction) == 4:
+        out1 = b'*( ' + instruction.operand(2) + b') = ' + instruction.operand(0)
+        out2 = b'*( ' + instruction.operand(2) + b' + 4) = ' + instruction.operand(1)
+    elif len(instruction) == 5:
+        out1 = (
+            b'*( ' +
+            instruction.operand(2) +
+            b' + ' +
+            instruction.operand(3) +
+            b' ) = ' +
+            instruction.operand(0)
+        )
+        out2 = (
+            b'*( ' +
+            instruction.operand(2) +
+            b' + ' +
+            instruction.operand(3) +
+            b' + 4 ) = ' +
+            instruction.operand(1)
+        )
     else:
         print(i)
         raise Exception
 
     return out1 + b';\n' + out2
-# store = (lambda i:  b'*( ' + (i[2] if len(i) < 4 else (i[2] + b' + ' + i[3] if len(i) < 5 else i[2] + b' + ' + i[3] + b' << ' + i[5])) + b' ) = ' + i[1] )
-
 def func_call(i: InstructionTokens) -> bytes:
-    if len(i) == 2:
-        return b'func_'+i[1]+b'();'
+    instruction = InstructionTokenView.from_tokens(i)
+    if len(instruction) == 2:
+        return b'func_'+instruction.operand(0)+b'();'
 
-    if i[3] == b'int':
+    return_type = instruction.operand(2)
+    if return_type == b'int':
         return_tag = b'r0 = '
-    elif i[3] == b'long':
+    elif return_type == b'long':
         return_tag = b'r0 = '
-    elif i[3] == b'float':
+    elif return_type == b'float':
         return_tag = b's0 = '
-    elif i[3] == b'double':
+    elif return_type == b'double':
         return_tag = b'd0 = '
-    elif i[3] == b'void':
+    elif return_type == b'void':
         return_tag = b''
     else:
         raise Exception
 
 
-    if len(i) <= 6:
+    if len(instruction) <= 6:
         args = b''
-    elif len(i) == 9:
-        args = i[7]
-    elif len(i) == 11:
-        args = b','.join([i[7], i[9]])
-    elif len(i) == 13:
-        args = b','.join([i[7], i[9], i[11]])
+    elif len(instruction) == 9:
+        args = instruction.operand(6)
+    elif len(instruction) == 11:
+        args = b','.join([instruction.operand(6), instruction.operand(8)])
+    elif len(instruction) == 13:
+        args = b','.join([instruction.operand(6), instruction.operand(8), instruction.operand(10)])
     else:
-        args = b','.join([i[7], i[9], i[11], i[13]])
+        args = b','.join([
+            instruction.operand(6),
+            instruction.operand(8),
+            instruction.operand(10),
+            instruction.operand(12),
+        ])
 
-    output = return_tag + i[4] + b'(' + args + b')'
+    output = return_tag + instruction.operand(3) + b'(' + args + b')'
 
     return output
 
